@@ -1,13 +1,14 @@
 // VELAMAR — open-world crime game. Titik masuk: membangun dunia, loop utama,
-// kontrol pemain (jalan kaki + mobil), wanted/polisi, misi, combat, toko, save.
+// kontrol pemain (jalan kaki + mobil), wanted/polisi + helikopter, misi,
+// combat, toko, save, jam kota, respect, dan kamera top-down untuk screenshot.
 import * as THREE from 'three';
-import { WORLD, DISTRICTS, CAR_MODELS, SHOPS, MISSIONS, GAME, DIALOGUE } from './config.js';
+import { WORLD, DISTRICTS, CAR_MODELS, SHOPS, MISSIONS, GAME, DENSITY, CLOCK, ARMOUR, RADIO, SHOP_PRICES, SHOP_LIMITS } from './config.js';
 import { makeRng, pick, range, clamp, dist2 } from './random.js';
 import { buildCity, resolveColliders } from './city.js';
 import { Car, nearestCar } from './vehicles.js';
 import { spawnTraffic, spawnPedestrians } from './traffic.js';
 import { PoliceChase } from './police-chase.js';
-import { MissionSystem } from './mission-delivery.js';
+import { MissionSystem, dialogFor } from './mission-delivery.js';
 import { Combat, Enemy } from './combat.js';
 import { Hud } from './hud.js';
 import { Minimap } from './minimap.js';
@@ -15,6 +16,7 @@ import { Input } from './input.js';
 import { SoundBank } from './audio.js';
 import { loadSave, writeSave, clearSave } from './save.js';
 import { parseShot, stageShot } from './screenshot-staging.js';
+import { absorbDamage, regenArmour, respectLevel } from './wanted-level.js';
 
 class Player {
   constructor(scene) {
@@ -28,28 +30,29 @@ class Player {
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.14, 10),
       new THREE.MeshLambertMaterial({ color: 0xffd23f }));
     cap.position.y = 2.32; this.mesh.add(cap);
-    // Spawn di trotoar timur jalan x=0 — (20,20) lama mentok dinding gedung
-    // 1,6m ke depan; dari (10,30) jalan lurus ke selatan bersih 60m+.
-    this.mesh.position.set(10, 0, 30);
+    // Ring kuning di bawah pemain — terlihat jelas dari kamera atas,
+    // membedakan pemain dari pejalan kaki lain.
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.95, 1.25, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
+    this.mesh.add(ring);
+    this.mesh.position.set(20, 0, 20);
     this.pos = this.mesh.position;
     this.heading = 0;
     this.health = GAME.startHealth;
-    this.armour = 50; // rompi: menyerap damage duluan, pulih saat aman
-    this.respect = 1; // RESPECT LV: +1 tiap misi selesai
+    this.armour = ARMOUR.start;
     this.inCar = false;
     this.car = null;
     this.walkBob = 0;
     scene.add(this.mesh);
   }
+  // Damage masuk ke armour dulu; sisanya baru ke health.
   damage(amount, cause) {
-    // Armour menyerap dulu (maks 50% dari damage), sisanya ke health.
-    let rest = amount;
-    if (this.armour > 0) {
-      const absorbed = Math.min(this.armour, amount * 0.5);
-      this.armour -= absorbed;
-      rest -= absorbed;
-    }
-    this.health -= rest;
+    const r = absorbDamage(amount, this.armour, this.health);
+    this.armour = r.armour;
+    this.health = r.health;
     return this.health <= 0;
   }
 }
@@ -70,7 +73,19 @@ class Game {
     this.paused = false;
     this.frozen = false;
     this.shotMode = null;
+    this.shopOpen = false; // menu beli sedang terbuka (game dijeda)
+    this.shopKind = null; // 'weapon' | 'car' | 'garage'
+    this.upgrades = { engine: 0, armour: 0 }; // upgrade garasi: mesin + armour maks
+    this.maxArmour = ARMOUR.max;
+    this.carSpeedMul = 1;
+    this.topDown = false; // kamera atas (mode screenshot)
+    this.topDownHeight = 240;
+    this.topDownOffset = { x: 0, z: 0 };
     this.money = GAME.startMoney;
+    this.respect = 1;
+    this.clockDay = CLOCK.day;
+    this.clockMin = CLOCK.hour * 60 + CLOCK.minute; // menit sejak 00:00
+    this.districtName = 'VELAMAR';
     this.ownedCars = [];
     this.enemies = [];
     this.combatStarted = false;
@@ -80,14 +95,11 @@ class Game {
     this.cameraYaw = Math.PI;
     this.cameraPitch = 0.3;
     this.camDist = 10;
-    this.topDownCam = null; // {x,z,h,fov,lookDx,lookDz} — kamera atas untuk screenshot
-    this.day = 1; // jam game: DAY 1 18:24, maju 1 menit game per 2 detik nyata
-    this.clockMinutes = 18 * 60 + 24;
 
     const { colliders } = buildCity(this.scene);
     this.colliders = colliders;
-    this.traffic = spawnTraffic(this.scene, 26);
-    this.peds = spawnPedestrians(this.scene, 44);
+    this.traffic = spawnTraffic(this.scene, DENSITY.traffic);
+    this.peds = spawnPedestrians(this.scene, DENSITY.pedestrians);
     this.parked = this.spawnParkedCars();
     this.player = new Player(this.scene);
     this.police = new PoliceChase(this.scene);
@@ -97,6 +109,14 @@ class Game {
 
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') this.tryStartMission(); });
+    // Tombol menu beli — aktif hanya saat menu toko/garasi terbuka.
+    window.addEventListener('keydown', (e) => {
+      if (!this.shopOpen) return;
+      if (e.code === 'Digit1') this.buyShopItem(0);
+      else if (e.code === 'Digit2') this.buyShopItem(1);
+      else if (e.code === 'Digit3') this.buyShopItem(2);
+      else if (e.code === 'KeyB' || e.code === 'Escape') this.closeShop();
+    });
     this.showStartScreen();
     this.last = performance.now();
     this.frames = 0;
@@ -131,6 +151,15 @@ class Game {
     return car;
   }
 
+  addRespect(n) {
+    this.respect = Math.min(5, this.respect + n);
+  }
+
+  applyUpgrades() {
+    this.maxArmour = ARMOUR.max + 25 * this.upgrades.armour;
+    this.carSpeedMul = 1 + 0.1 * this.upgrades.engine;
+  }
+
   // ---------- layar ----------
   showStartScreen() {
     const save = loadSave();
@@ -140,7 +169,8 @@ class Game {
         `8 misi cerita menantimu — dari pesan pertama Mara sampai pelarian terakhir di dermaga.`
       : `Curi mobil apa pun, kabur dari kejaran polisi 3 bintang sebelum waktu habis.<br>` +
         `8 misi cerita menantimu — dari pesan pertama Mara sampai pelarian terakhir di dermaga.<br>` +
-        `Kota VELAMAR: pantai, mercusuar Faro Vela, lalu lintas, dan polisi yang tidak pernah tidur.`;
+        `Kota VELAMAR: pantai, mercusuar Faro Vela, lalu lintas, dan polisi yang tidak pernah tidur.<br>` +
+        `Armour menyerap damage — pulih saat kamu aman. Respect naik tiap misi selesai.`;
     const foot = save ? 'Tekan N untuk mulai dari awal (hapus save).' : 'Progres tersimpan otomatis di browser ini.';
     this.hud.showScreen('VELAMAR', txt, save ? '▶ LANJUTKAN' : '▶ MULAI MAIN', () => this.startGame(save));
     document.getElementById('screen-foot').textContent = foot;
@@ -151,6 +181,9 @@ class Game {
     if (save) {
       this.money = save.money;
       this.missions.index = Math.min(save.mission, MISSIONS.length - 1);
+      this.respect = respectLevel(save.mission);
+      this.upgrades = save.upgrades || { engine: 0, armour: 0 };
+      this.applyUpgrades();
       if (save.hasPistol) { this.combat.hasPistol = true; this.combat.ammo = save.ammo || 0; }
       this.ownedCars = save.ownedCars || [];
     }
@@ -185,7 +218,7 @@ class Game {
       this.hud.showMessage(`MISI ${m.id} — ${m.title}: ${m.text}`);
       if (m.type === 'steal') this.spawnStealTarget();
       if (m.type === 'combat') this.spawnEnemies();
-      if (m.type === 'hotdrop') { this.police.addWanted(2, 'paket panas'); }
+      if (m.type === 'heist') { this.police.addWanted(2, 'alarm bank'); }
       if (m.type === 'finale') { this.police.addWanted(4, 'pelarian terakhir'); }
       if (m.type === 'escape') { this.police.addWanted(1, 'cari masalah'); }
     } else if (type === 'complete') {
@@ -193,11 +226,9 @@ class Game {
       this.sound.win();
       writeSave(this.saveState());
       const next = MISSIONS[this.missions.index];
-      this.player.respect = 1 + this.missions.index; // +1 LV tiap misi selesai
-      this.hud.setRespect(this.player.respect, 20);
       this.paused = true;
       this.hud.showScreen('MISI SELESAI!',
-        `<b>${m.title}</b> — hadiah <b style="color:#ffd23f">$${m.reward}</b> &nbsp;•&nbsp; Total: <b>$${this.money}</b><br>` +
+        `<b>${m.title}</b> — hadiah <b style="color:#ffd23f">$${m.reward}</b> &nbsp;•&nbsp; Total: <b>$${this.money}</b> &nbsp;•&nbsp; Respect LV <b>${this.respect}</b><br>` +
         (next ? `Misi berikutnya: <b>${next.title}</b> — ${next.text}` : 'Semua misi selesai. Kamu legenda Velamar! 🏆'),
         next ? 'LANJUTKAN' : 'MAIN BEBAS', () => { this.paused = false; });
     } else if (type === 'fail') {
@@ -210,7 +241,7 @@ class Game {
     }
   }
   saveState() {
-    return { money: this.money, missionIndex: this.missions.index, hasPistol: this.combat.hasPistol, ammo: this.combat.ammo, ownedCars: this.ownedCars };
+    return { money: this.money, missionIndex: this.missions.index, hasPistol: this.combat.hasPistol, ammo: this.combat.ammo, ownedCars: this.ownedCars, upgrades: this.upgrades };
   }
   spawnStealTarget() {
     const model = CAR_MODELS.find((m) => m.id === 'sport');
@@ -250,7 +281,7 @@ class Game {
     if (!car.stolen && !this.ownedCars.includes(car)) {
       car.stolen = true;
       this.police.addWanted(1, 'curi mobil');
-      this.hud.showMessage('Mobil dicuri! Wanted +1 ★ — polisi mengejarmu!');
+      this.hud.showMessage('Mobil dicuri! Wanted +1★');
       this.sound.horn();
     }
     // taksi: penumpang ikut kalau misi taksi aktif
@@ -268,53 +299,119 @@ class Game {
     this.camDist = 10;
   }
 
-  // ---------- toko ----------
+  // ---------- toko & garasi ----------
   nearestShop() {
     const p = this.player.pos;
     if (dist2(p.x, p.z, SHOPS.weapon.x, SHOPS.weapon.z) < 100) return 'weapon';
     if (dist2(p.x, p.z, SHOPS.car.x, SHOPS.car.z) < 100) return 'car';
+    if (dist2(p.x, p.z, SHOPS.garage.x, SHOPS.garage.z) < 100) return 'garage';
     return null;
   }
-  buyAtShop(kind) {
+  shopTitle(kind) {
+    return kind === 'weapon' ? 'TOKO SENJATA "EL GATILLO"'
+      : kind === 'car' ? 'DEALER "COMETA MOTORS"'
+      : 'GARASI VELA — UPGRADE';
+  }
+  shopItemsFor(kind) {
     if (kind === 'weapon') {
-      if (!this.combat.hasPistol) {
-        if (this.money >= SHOPS.weapon.pistolPrice) {
-          this.money -= SHOPS.weapon.pistolPrice;
-          this.combat.buyPistol();
-          this.hud.showMessage('Pistol dibeli! Tekan 2 untuk memakainya. ($150)');
-        } else this.hud.showMessage('Uang tidak cukup — pistol $150.');
-      } else if (this.money >= SHOPS.weapon.ammoPrice) {
-        this.money -= SHOPS.weapon.ammoPrice;
-        this.combat.buyAmmo();
-        this.hud.showMessage('Amunisi +12 dibeli. ($40)');
-      } else this.hud.showMessage('Uang tidak cukup — amunisi $40.');
-    } else if (kind === 'car') {
+      return [
+        { name: 'Pistol Vela', price: SHOP_PRICES.pistol, note: this.combat.hasPistol ? 'DIMILIKI' : 'senjata', disabled: this.combat.hasPistol },
+        { name: 'Amunisi +12', price: SHOP_PRICES.ammo, note: this.combat.hasPistol ? '' : 'butuh pistol', disabled: !this.combat.hasPistol || this.combat.ammo >= GAME.pistolAmmoMax },
+        { name: 'Isi Armour Penuh', price: SHOP_PRICES.armourRefill, note: `armour → ${this.maxArmour}`, disabled: this.player.armour >= this.maxArmour },
+      ];
+    }
+    if (kind === 'car') {
       const model = CAR_MODELS.find((m) => m.id === SHOPS.car.carId);
-      if (this.ownedCars.includes(model.id)) { this.hud.showMessage('Cometa GT sudah milikmu — ada di Garasi Vela.'); return; }
-      if (this.money >= model.price) {
-        this.money -= model.price;
+      const owned = this.ownedCars.includes(model.id);
+      return [
+        { name: `Cometa GT — ${model.speed * 3.6} km/jam`, price: model.price, note: owned ? 'DIMILIKI' : 'mobil sport', disabled: owned },
+        { name: 'Amunisi +12', price: SHOP_PRICES.ammo, note: this.combat.hasPistol ? '' : 'butuh pistol', disabled: !this.combat.hasPistol || this.combat.ammo >= GAME.pistolAmmoMax },
+        { name: 'Isi Armour Penuh', price: SHOP_PRICES.armourRefill, note: `armour → ${this.maxArmour}`, disabled: this.player.armour >= this.maxArmour },
+      ];
+    }
+    // garasi — upgrade mobil milik: mesin (kecepatan) + armour maks
+    return [
+      { name: `Mesin Turbo +10% (LV ${this.upgrades.engine}/${SHOP_LIMITS.engineMax})`, price: SHOP_PRICES.engine, note: this.upgrades.engine >= SHOP_LIMITS.engineMax ? 'MAKS' : 'semua mobilmu', disabled: this.upgrades.engine >= SHOP_LIMITS.engineMax },
+      { name: `Armour Maks +25 (LV ${this.upgrades.armour}/${SHOP_LIMITS.armourMaxLevel})`, price: SHOP_PRICES.armourMax, note: this.upgrades.armour >= SHOP_LIMITS.armourMaxLevel ? 'MAKS' : `maks → ${this.maxArmour + 25}`, disabled: this.upgrades.armour >= SHOP_LIMITS.armourMaxLevel },
+      { name: 'Isi Armour Penuh', price: SHOP_PRICES.armourRefill, note: `armour → ${this.maxArmour}`, disabled: this.player.armour >= this.maxArmour },
+    ];
+  }
+  openShop(kind) {
+    this.shopKind = kind;
+    this.shopOpen = true;
+    this.hud.showShop(this.shopTitle(kind), this.shopItemsFor(kind), this.money, (i) => this.buyShopItem(i));
+  }
+  refreshShop() {
+    if (!this.shopOpen) return;
+    this.hud.showShop(this.shopTitle(this.shopKind), this.shopItemsFor(this.shopKind), this.money, (i) => this.buyShopItem(i));
+  }
+  closeShop() {
+    this.shopOpen = false;
+    this.shopKind = null;
+    this.hud.hideShop();
+    // Bersihkan tombol yang ditekan selama menu terbuka — jangan bocor ke game.
+    this.input.pressed = {};
+    this.input.keys['KeyB'] = false;
+    this.input.keys['Escape'] = false;
+  }
+  buyShopItem(i) {
+    const kind = this.shopKind;
+    const items = this.shopItemsFor(kind);
+    const it = items[i];
+    if (!it || it.disabled) return;
+    if (this.money < it.price) {
+      this.hud.showMessage('Uang tidak cukup!');
+      this.sound.fail();
+      return;
+    }
+    this.money -= it.price;
+    if (kind === 'weapon' || kind === 'car') {
+      if (i === 0 && kind === 'weapon') {
+        this.combat.buyPistol();
+        this.hud.showMessage('Pistol dibeli! Tekan 2 untuk memakainya.');
+      } else if (i === 0 && kind === 'car') {
+        const model = CAR_MODELS.find((m) => m.id === SHOPS.car.carId);
         this.ownedCars.push(model.id);
         const car = new Car(this.scene, model, SHOPS.garage.x, SHOPS.garage.z, 0);
         car.stolen = true; // milik sendiri, bukan curian
         this.parked.push(car);
         this.hud.showMessage(`Cometa GT dibeli! ($${model.price}) — parkir di Garasi Vela.`);
-      } else this.hud.showMessage(`Uang tidak cukup — Cometa GT $${model.price}.`);
+      } else if ((kind === 'weapon' && i === 1) || (kind === 'car' && i === 1)) {
+        this.combat.buyAmmo();
+        this.hud.showMessage('Amunisi +12 dibeli.');
+      } else {
+        this.player.armour = this.maxArmour;
+        this.hud.showMessage('Armour penuh!');
+      }
+    } else if (kind === 'garage') {
+      if (i === 0) {
+        this.upgrades.engine += 1;
+        this.applyUpgrades();
+        this.hud.showMessage(`Mesin Turbo LV ${this.upgrades.engine}! Semua mobilmu lebih cepat.`);
+      } else if (i === 1) {
+        this.upgrades.armour += 1;
+        this.applyUpgrades();
+        this.hud.showMessage(`Armour Maks naik ke ${this.maxArmour}!`);
+      } else {
+        this.player.armour = this.maxArmour;
+        this.hud.showMessage('Armour penuh!');
+      }
     }
+    this.sound.coin();
     this.updateWeaponLine();
+    this.hud.setMoney(this.money);
     writeSave(this.saveState());
+    this.refreshShop();
   }
   updateWeaponLine() {
-    const c = this.combat;
-    if (c.weapon === 'pistol' && c.hasPistol) this.hud.setWeaponLabel(`🔫 PISTOL VELA — ${c.ammo} / 120`);
-    else if (c.hasPistol) this.hud.setWeaponLabel(`✊ Tangan kosong — tekan 2: PISTOL VELA (${c.ammo} peluru)`);
-    else this.hud.setWeaponLabel('✊ Tangan kosong — beli pistol di Toko Senjata ($150)');
-  }
-
-  // Kamera atas (top-down) untuk screenshot: datar, padat, seperti cover juara.
-  setTopDownCamera(x, z, height, fov, lookDx = 0, lookDz = 0) {
-    this.topDownCam = { x, z, h: height, fov, lookDx, lookDz };
-    this.camera.fov = fov;
-    this.camera.updateProjectionMatrix();
+    const w = this.combat.weapon;
+    if (w === 'pistol' && this.combat.hasPistol) {
+      this.hud.setWeapon(`🔫 ${GAME.pistolName} — ${this.combat.ammo}/${GAME.pistolAmmoMax}`);
+    } else if (this.combat.hasPistol) {
+      this.hud.setWeapon(`✊ Tangan kosong — tekan 2 untuk pistol (${this.combat.ammo}/${GAME.pistolAmmoMax})`);
+    } else {
+      this.hud.setWeapon('✊ Tangan kosong — beli pistol di Toko Senjata ($150)');
+    }
   }
 
   // ---------- taksi sampingan ----------
@@ -340,8 +437,7 @@ class Game {
     requestAnimationFrame(this.loop);
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    if (!this.frozen && this.started && !this.paused) this.stepWorld(dt, false);
-    else if (this.frozen) this.renderOnce();
+    if (!this.frozen && this.started && !this.paused && !this.shopOpen) this.stepWorld(dt, false);
     else this.renderOnce();
     this.frames += 1;
     if (this.frames === 5) window.__VELAMAR_READY__ = true;
@@ -366,6 +462,12 @@ class Game {
     const mouse = input.consumeMouse();
     this.cameraYaw -= mouse.dx * 0.004;
     this.cameraPitch = clamp(this.cameraPitch + mouse.dy * 0.003, 0.08, 1.1);
+
+    // --- jam kota maju saat main ---
+    if (!staging && this.started && !this.paused) {
+      this.clockMin += dt * CLOCK.minutesPerSecond;
+      if (this.clockMin >= 1440) { this.clockMin -= 1440; this.clockDay += 1; }
+    }
 
     // --- gerak pemain ---
     if (!p.inCar) {
@@ -411,7 +513,7 @@ class Game {
       const mv = input.moveVector();
       const throttle = mv.z < 0 ? 1 : mv.z > 0 ? -1 : 0;
       const steer = mv.x;
-      p.car.drive(throttle, steer, dt);
+      p.car.drive(throttle, steer, dt, this.carSpeedMul);
       resolveColliders(p.car.pos, 2.2, this.colliders);
       p.car.pos.x = clamp(p.car.pos.x, -WORLD.halfSize - 20, WORLD.halfSize);
       p.car.pos.z = clamp(p.car.pos.z, -WORLD.halfSize, WORLD.halfSize);
@@ -478,9 +580,10 @@ class Game {
       if (car) prompt = `[E] Masuk ${car.model.name}`;
       else {
         const shop = this.nearestShop();
-        if (shop === 'weapon') prompt = this.combat.hasPistol ? '[B] Beli amunisi $40' : '[B] Beli pistol $150';
-        else if (shop === 'car') prompt = '[B] Beli Cometa GT $1200';
-        if (shop && input.hit('KeyB')) this.buyAtShop(shop);
+        if (shop === 'weapon') prompt = '[B] Toko Senjata — beli pistol / ammo / armour';
+        else if (shop === 'car') prompt = '[B] Dealer Cometa Motors — beli mobil';
+        else if (shop === 'garage') prompt = '[B] Garasi Vela — upgrade mesin / armour';
+        if (shop && input.hit('KeyB')) this.openShop(shop);
       }
     } else prompt = '[E] Keluar mobil';
     if (!p.inCar && this.missions.state !== 'active' && this.missions.current()) {
@@ -488,34 +591,31 @@ class Game {
     }
     this.hud.showPrompt(prompt);
 
-    // --- jam game maju + kesehatan & armour pulih saat aman ---
-    this.clockMinutes += dt * 0.5; // 1 menit game per 2 detik nyata
-    if (this.clockMinutes >= 24 * 60) { this.clockMinutes -= 24 * 60; this.day += 1; }
-    if (this.police.wanted === 0 && p.health < GAME.startHealth) p.health = Math.min(GAME.startHealth, p.health + 2 * dt);
-    if (this.police.wanted === 0 && p.armour < 50) p.armour = Math.min(50, p.armour + 1 * dt);
+    // --- kesehatan + armour pulih saat aman ---
+    if (this.police.wanted === 0) {
+      if (p.health < GAME.startHealth) p.health = Math.min(GAME.startHealth, p.health + 2 * dt);
+      p.armour = regenArmour(p.armour, 0, dt, this.maxArmour);
+    }
+
+    // --- respect mengikuti progres misi ---
+    this.respect = respectLevel(this.missions.index);
+
+    // --- distrik terdekat (label HUD) ---
+    let bestD = Infinity, bestName = 'VELAMAR';
+    for (const d of DISTRICTS) {
+      const dd = dist2(p.pos.x, p.pos.z, d.x, d.z);
+      if (dd < bestD) { bestD = dd; bestName = d.name; }
+    }
+    this.districtName = bestName;
 
     // --- HUD + minimap ---
     this.hud.setHealth(p.health);
-    this.hud.setArmour(p.armour);
-    this.hud.setRespect(p.respect, 20);
+    this.hud.setArmour(p.armour, this.maxArmour);
     this.hud.setMoney(this.money);
     this.hud.setWanted(this.police.wanted);
-    this.hud.setClock(this.day, Math.floor(this.clockMinutes / 60), Math.floor(this.clockMinutes % 60));
-    this.hud.setDistrict(this.nearestDistrict(p.pos.x, p.pos.z));
+    this.hud.setRespect(this.respect);
+    this.updateWeaponLine();
     const m = this.missions.current();
-    // jarak ke tujuan + dialog pemberi misi
-    const tgt = this.taxiFare
-      ? (this.taxiFare.stage === 'pickup' ? this.taxiFare.pickup : this.taxiFare.drop)
-      : this.missions.targetPos();
-    if (tgt) {
-      const d = Math.round(Math.hypot(tgt.x - p.pos.x, tgt.z - p.pos.z));
-      const tName = this.taxiFare ? 'Tujuan taksi' : (m ? m.title : 'Tujuan');
-      this.hud.setDistance(`${d}m ke ${tName}`);
-    } else this.hud.setDistance('');
-    if (m && this.missions.state === 'active' && DIALOGUE[m.id]) {
-      const [who, ...rest] = DIALOGUE[m.id].split(': ');
-      this.hud.setDialogue(`<b>${who}:</b> ${rest.join(': ')}`);
-    } else this.hud.setDialogue(null);
     if (this.taxiFare) {
       this.hud.setObjective('TAKSI — $80', this.taxiFare.stage === 'pickup' ? 'Jemput penumpang di penanda kuning.' : 'Antar penumpang ke tujuan!');
     } else if (m && this.missions.state === 'active') {
@@ -528,14 +628,23 @@ class Game {
       this.hud.setObjective('VELAMAR — BEBAS', 'Semua misi selesai! Jelajahi kota, taksi (T), atau beli mobil.');
       this.hud.setTimer(0);
     }
-    this.hud.setSpeed(p.inCar ? p.car.kmh() : 0, p.inCar, p.inCar ? p.car.model.name : '');
+    const dlg = dialogFor(m);
+    this.hud.setDialog(dlg ? dlg.giver : null, dlg ? dlg.line : null);
+    const tgt = this.taxiFare
+      ? (this.taxiFare.stage === 'pickup' ? this.taxiFare.pickup : this.taxiFare.drop)
+      : this.missions.targetPos();
+    this.hud.setDistance(tgt ? Math.hypot(tgt.x - p.pos.x, tgt.z - p.pos.z) : null);
+    this.hud.setClock(this.clockDay, Math.floor(this.clockMin / 60), Math.floor(this.clockMin % 60));
+    this.hud.setDistrict(this.districtName);
+    const station = RADIO[Math.floor(this.clockMin / 30) % RADIO.length];
+    this.hud.setRadio(`🎵 ${station.name} ${station.freq} — ${station.style}`);
+    this.hud.setSpeed(p.inCar ? p.car.kmh() : 0, p.inCar);
+    this.hud.setCarName(p.inCar ? p.car.model.name : '');
     this.hud.setCrosshair(!p.inCar && this.combat.weapon === 'pistol' && this.combat.hasPistol);
     this.hud.update(dt);
     this.minimap.draw({
       player: { x: p.pos.x, z: p.pos.z, heading: p.inCar ? p.car.heading : p.heading },
-      target: this.taxiFare
-        ? (this.taxiFare.stage === 'pickup' ? this.taxiFare.pickup : this.taxiFare.drop)
-        : this.missions.targetPos(),
+      target: tgt,
       cars: [...this.traffic.map((t) => ({ x: t.car.pos.x, z: t.car.pos.z })), ...this.parked.map((c) => ({ x: c.pos.x, z: c.pos.z }))],
       police: this.police.cars.map((c) => ({ x: c.pos.x, z: c.pos.z })),
     });
@@ -588,7 +697,7 @@ class Game {
     if (this.paused) return;
     this.money = Math.max(0, this.money - GAME.wastedFine);
     this.player.health = GAME.startHealth;
-    this.player.armour = 50;
+    this.player.armour = ARMOUR.start;
     this.player.pos.set(60, 0, 200);
     if (this.player.inCar) this.exitCar();
     this.police.clearAll();
@@ -600,7 +709,7 @@ class Game {
     if (this.paused) return;
     this.money = Math.max(0, this.money - GAME.bustedFine);
     this.player.health = GAME.startHealth;
-    this.player.armour = 50;
+    this.player.armour = ARMOUR.start;
     this.player.pos.set(120, 0, -40);
     if (this.player.inCar) this.exitCar();
     this.police.clearAll();
@@ -609,25 +718,19 @@ class Game {
     this.hud.showScreen('TERTANGKAP!', `Polisi Velamar menahanmu semalam. Denda: <b>$${GAME.bustedFine}</b><br>Uangmu sekarang: <b>$${this.money}</b>`, 'BEBAS LAGI', () => { this.paused = false; });
   }
 
-  // Distrik terdekat dari posisi pemain — untuk label HUD.
-  nearestDistrict(x, z) {
-    let best = DISTRICTS[0], bestD = Infinity;
-    for (const d of DISTRICTS) {
-      const dd = (d.x - x) * (d.x - x) + (d.z - z) * (d.z - z);
-      if (dd < bestD) { bestD = dd; best = d; }
-    }
-    return best.name;
-  }
-
   updateCamera(dt) {
-    // Mode top-down (screenshot): kamera tetap di atas blok kota.
-    if (this.topDownCam) {
-      const t = this.topDownCam;
-      this.camera.position.set(t.x + t.lookDx * 0.25, t.h, t.z + t.lookDz * 0.25);
-      this.camera.lookAt(t.x + t.lookDx, 0, t.z + t.lookDz);
+    const p = this.player;
+    if (this.topDown) {
+      // Kamera atas: lurus ke bawah, utara (-z) di atas layar, jalan sejajar sumbu.
+      const target = p.inCar ? p.car.pos : p.pos;
+      const tx = target.x + this.topDownOffset.x;
+      const tz = target.z + this.topDownOffset.z;
+      this.camera.up.set(0, 0, -1);
+      this.camera.position.set(tx, this.topDownHeight, tz + 0.01);
+      this.camera.lookAt(tx, 0, tz);
       return;
     }
-    const p = this.player;
+    this.camera.up.set(0, 1, 0);
     const target = p.inCar ? p.car.pos : p.pos;
     const ty = (p.inCar ? 2.2 : 2.0);
     const dist = this.camDist;

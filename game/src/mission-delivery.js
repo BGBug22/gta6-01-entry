@@ -1,9 +1,15 @@
-// Misi cerita + aktivitas sampingan — rantai 8 misi "Tiga Hari di Velamar",
-// taksi dadakan, dan balapan jalanan yang bisa diulang. Setiap misi punya
-// objektif, target di peta, timer opsional, hadiah, dan layar selesai/gagal.
+// Mission delivery — rantai 8 misi cerita "Tiga Hari di Velamar" + aktivitas sampingan.
+// Setiap misi punya objektif, target di peta, timer opsional, hadiah, dan dialog.
+// Sistem ini hanya mengantar misi; layar selesai/gagal ditangani game utama.
 import * as THREE from 'three';
-import { MISSIONS, CAR_MODELS, GAME } from './config.js';
+import { MISSIONS, CAR_MODELS, GAME, DIALOGS } from './config.js';
 import { dist2 } from './random.js';
+
+// Baris dialog untuk satu misi: { giver, line }.
+export function dialogFor(mission) {
+  if (!mission) return null;
+  return DIALOGS[mission.id] || null;
+}
 
 export class MissionSystem {
   constructor(scene, onEvent) {
@@ -14,13 +20,16 @@ export class MissionSystem {
     this.timer = 0;
     this.gates = []; // gerbang balapan {x,z,passed,mesh}
     this.gateIndex = 0;
-    this.taxi = null; // {ped, pickup, drop}
+    this.taxi = null; // {stage, pickup, drop}
+    this.heistGrabbed = false; // heist: false = menuju bank, true = kabur ke dermaga
     this.combatTargets = [];
     this.raceActive = false;
     this.escapeStartWanted = 0;
     this.marker = this.makeMarker();
+    this.animT = 0; // jam animasi simulasi (BUKAN performance.now — harus deterministik)
     scene.add(this.marker);
   }
+
   makeMarker() {
     const g = new THREE.Group();
     const beam = new THREE.Mesh(
@@ -41,7 +50,9 @@ export class MissionSystem {
     g.visible = false;
     return g;
   }
+
   current() { return MISSIONS[this.index] || null; }
+
   start() {
     const m = this.current();
     if (!m) return;
@@ -49,14 +60,17 @@ export class MissionSystem {
     this.timer = m.time || 0;
     this.gateIndex = 0;
     this.taxi = null;
+    this.heistGrabbed = false;
     this.clearGates();
     if (m.type === 'race') this.buildRaceGates();
     this.onEvent('start', m);
   }
+
   clearGates() {
     for (const g of this.gates) this.scene.remove(g.mesh);
     this.gates = [];
   }
+
   buildRaceGates() {
     const pts = [
       { x: 80, z: 0 }, { x: 80, z: 160 }, { x: -80, z: 160 }, { x: -80, z: -80 },
@@ -71,23 +85,28 @@ export class MissionSystem {
       this.gates.push({ ...p, passed: false, mesh });
     }
   }
+
   targetPos() {
     const m = this.current();
     if (!m) return null;
     if (m.type === 'race' && this.gates[this.gateIndex]) return this.gates[this.gateIndex];
     if (m.type === 'taxi' && this.taxi) return this.taxi.stage === 'pickup' ? this.taxi.pickup : this.taxi.drop;
+    if (m.type === 'heist') return this.heistGrabbed ? m.getaway : m.target;
     return m.target;
   }
+
   complete(game) {
     const m = this.current();
     this.state = 'done';
     this.clearGates();
+    this.heistGrabbed = false;
     this.marker.visible = false;
     game.money += m.reward;
     this.index += 1; // naik dulu supaya save mencatat misi berikutnya
     this.state = 'idle';
     this.onEvent('complete', m);
   }
+
   fail(reason) {
     this.state = 'failed';
     this.clearGates();
@@ -95,6 +114,7 @@ export class MissionSystem {
     this.onEvent('fail', { mission: this.current(), reason });
     this.state = 'idle';
   }
+
   // Dipanggil tiap frame. game = objek game utama (player, police, dll).
   update(dt, game) {
     const m = this.current();
@@ -106,18 +126,28 @@ export class MissionSystem {
     const p = game.player.pos;
     const t = this.targetPos();
     if (t) {
+      this.animT += dt;
       this.marker.visible = true;
       this.marker.position.set(t.x, 0, t.z);
       this.marker.rotation.y += dt * 2;
-      this.marker.children[2].position.y = 12 + Math.sin(performance.now() * 0.004) * 1.2;
+      this.marker.children[2].position.y = 12 + Math.sin(this.animT * 4) * 1.2;
     }
     const near = (x, z, r = 7) => dist2(p.x, p.z, x, z) < r * r;
 
     switch (m.type) {
       case 'goto':
-      case 'hotdrop':
         if (near(m.target.x, m.target.z, 8)) this.complete(game);
         break;
+      case 'heist': {
+        // Fase 1: masuk bank & ambil rampasan. Fase 2: kabur ke dermaga.
+        if (!this.heistGrabbed && near(m.target.x, m.target.z, 8)) {
+          this.heistGrabbed = true;
+          this.onEvent('info', { text: 'Uang rampasan didapat! Kabur ke dermaga!' });
+        } else if (this.heistGrabbed && near(m.getaway.x, m.getaway.z, 9)) {
+          this.complete(game);
+        }
+        break;
+      }
       case 'taxi': {
         if (!this.taxi) {
           // penumpang muncul di target misi

@@ -1,10 +1,23 @@
-// Kota VELAMAR — membangun semua mesh statis: jalan, trotoar, gedung, pantai,
-// laut, dermaga, mercusuar Faro Vela, papan nama distrik, pohon dan lampu.
-// Mengembalikan { group, colliders, markers } — colliders = AABB gedung & tembok.
+// Kota VELAMAR — membangun semua mesh statis: jalan, trotoar, zebra cross,
+// gedung ber-grid jendela menyala + atap genteng hangat, pantai, laut, dermaga,
+// mercusuar Faro Vela, papan nama distrik + decal tanah, payung & menara pantai.
+// Mengembalikan { group, colliders } — colliders = AABB gedung & tembok.
 import * as THREE from 'three';
-import { WORLD, DISTRICTS, PALETTE } from './config.js';
+import { WORLD, DISTRICTS, PALETTE, ROOF_COLORS, SHOP_SIGNS } from './config.js';
 import { makeRng, pick, range } from './random.js';
 
+// LCG kecil untuk tekstur deterministik (bukan Math.random).
+function lcg(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Tekstur papan nama (canvas) — untuk signage vertikal.
 function textTexture(lines, opts = {}) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -25,63 +38,41 @@ function textTexture(lines, opts = {}) {
   return t;
 }
 
-// Tekstur tanah hangat berbintik (canvas, deterministik) — tanah tidak lagi datar polos.
-function groundTexture() {
+// Decal tanah — teks dicat di jalan, terbaca dari kamera atas.
+// vertical = teks memanjang sepanjang sumbu z (jalan vertikal).
+function groundDecalTexture(text, sub, color, vertical) {
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
+  c.width = vertical ? 128 : 512;
+  c.height = vertical ? 512 : 128;
   const g = c.getContext('2d');
-  g.fillStyle = '#cf9f66'; g.fillRect(0, 0, 256, 256);
-  const rng = makeRng(WORLD.seed + 5);
-  for (let i = 0; i < 900; i++) {
-    const v = rng();
-    g.fillStyle = v < 0.5 ? 'rgba(120,80,40,0.10)' : 'rgba(255,230,170,0.10)';
-    const s = 2 + rng() * 6;
-    g.fillRect(rng() * 256, rng() * 256, s, s);
-  }
-  // bercak rumput hangat di sana-sini
-  for (let i = 0; i < 26; i++) {
-    g.fillStyle = 'rgba(122,150,80,0.20)';
-    g.beginPath();
-    g.ellipse(rng() * 256, rng() * 256, 8 + rng() * 18, 6 + rng() * 12, rng() * 3, 0, Math.PI * 2);
-    g.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(24, 24);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Tekstur zebra cross: garis putih di keempat sisi, dipakai ulang di semua persimpangan.
-function zebraTexture() {
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  g.clearRect(0, 0, 128, 128);
-  g.fillStyle = 'rgba(255,245,220,0.92)';
-  for (let i = 0; i < 6; i++) {
-    g.fillRect(10 + i * 18, 0, 9, 22); // atas
-    g.fillRect(10 + i * 18, 106, 9, 22); // bawah
-    g.fillRect(0, 10 + i * 18, 22, 9); // kiri
-    g.fillRect(106, 10 + i * 18, 22, 9); // kanan
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Tekstur grid jendela menyala — dinding gedung tidak lagi polos dari atas maupun samping.
-function windowTexture(warm) {
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = warm ? '#8a6a45' : '#5a6a80'; g.fillRect(0, 0, 128, 128);
-  const rng = makeRng(WORLD.seed + 11);
-  for (let y = 8; y < 120; y += 18) {
-    for (let x = 8; x < 120; x += 16) {
-      const lit = rng();
-      g.fillStyle = lit < 0.55 ? '#ffe9a8' : lit < 0.8 ? '#9fd8ff' : '#2b3a55';
-      g.fillRect(x, y, 10, 12);
+  g.clearRect(0, 0, c.width, c.height);
+  g.textAlign = 'center';
+  g.lineWidth = 8;
+  g.strokeStyle = 'rgba(10,20,35,.85)';
+  g.fillStyle = color;
+  if (vertical) {
+    g.save();
+    g.translate(64, 256);
+    g.rotate(Math.PI / 2);
+    g.font = 'bold 54px Arial, sans-serif';
+    g.strokeText(text, 0, 10);
+    g.fillText(text, 0, 10);
+    if (sub) {
+      g.font = 'bold 26px Arial, sans-serif';
+      g.fillStyle = '#ffffff';
+      g.strokeText(sub, 0, 52);
+      g.fillText(sub, 0, 52);
+    }
+    g.restore();
+  } else {
+    g.font = 'bold 60px Arial, sans-serif';
+    g.strokeText(text, 256, 62);
+    g.fillText(text, 256, 62);
+    if (sub) {
+      g.font = 'bold 28px Arial, sans-serif';
+      g.fillStyle = '#ffffff';
+      g.strokeText(sub, 256, 104);
+      g.fillText(sub, 256, 104);
     }
   }
   const t = new THREE.CanvasTexture(c);
@@ -89,7 +80,63 @@ function windowTexture(warm) {
   return t;
 }
 
-// Kotak bantu — gedung, atap, menara, dll.
+// Tekstur tanah — hijau hangat berbintik (bukan datar polos).
+function groundTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#a8b078'; g.fillRect(0, 0, 256, 256);
+  const r = lcg(7);
+  const dots = ['#98a868', '#b8c088', '#c9b183', '#8a9a68', '#b0a06a'];
+  for (let i = 0; i < 900; i++) {
+    g.fillStyle = dots[Math.floor(r() * dots.length)];
+    const s = 2 + r() * 5;
+    g.fillRect(r() * 256, r() * 256, s, s);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(28, 28);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Fasad gedung — dinding hangat + grid jendela (sebagian menyala kuning).
+function facadeTexture(wall, lit, seed) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = wall; g.fillRect(0, 0, 128, 256);
+  const r = lcg(seed);
+  // lantai dasar lebih gelap
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 216, 128, 40);
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 5; col++) {
+      const x = 10 + col * 22, y = 12 + row * 22;
+      g.fillStyle = r() < lit ? (r() < 0.5 ? '#ffd23f' : '#fff2c9') : '#2b3a55';
+      g.fillRect(x, y, 14, 16);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Zebra cross — garis putih memanjang searah jalan.
+function crosswalkTexture(horizontal) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 64);
+  g.fillStyle = '#f5f0dc';
+  for (let i = 0; i < 5; i++) {
+    if (horizontal) g.fillRect(0, 6 + i * 12, 128, 6);
+    else g.fillRect(10 + i * 24, 0, 12, 64);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function box(w, h, d, color, x, y, z, opts = {}) {
   const m = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -106,15 +153,15 @@ export function buildCity(scene) {
   const colliders = []; // {minX,maxX,minZ,maxZ}
   const H = WORLD.halfSize;
 
-  // --- Langit, kabut, matahari (hangat sun-soaked) ---
+  // --- Langit, kabut, matahari sore ---
   scene.background = new THREE.Color(PALETTE.sky);
-  scene.fog = new THREE.Fog(PALETTE.fog, 260, 950);
+  scene.fog = new THREE.Fog(PALETTE.fog, 250, 900);
   const sun = new THREE.DirectionalLight(0xffe9b8, 2.6);
   sun.position.set(180, 260, 120);
   scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0xffe9c9, 0xb08a5a, 1.25));
+  scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x9a8a62, 1.15));
 
-  // --- Tanah dasar kota (bertekstur hangat, bukan datar) ---
+  // --- Tanah dasar kota (bertekstur) ---
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(H * 2 + 200, H * 2 + 200),
     new THREE.MeshLambertMaterial({ map: groundTexture() }),
@@ -164,17 +211,51 @@ export function buildCity(scene) {
     }
   }
 
-  // --- Zebra cross di setiap persimpangan (terbaca dari atas, seperti juara) ---
-  const zebraTex = zebraTexture();
-  const zebraMat = new THREE.MeshBasicMaterial({ map: zebraTex, transparent: true, depthWrite: false });
+  // --- Zebra cross di SEMUA persimpangan ---
+  const crossV = new THREE.MeshBasicMaterial({ map: crosswalkTexture(false), transparent: true });
+  const crossH = new THREE.MeshBasicMaterial({ map: crosswalkTexture(true), transparent: true });
+  const crossGeoV = new THREE.PlaneGeometry(14, 9);
+  const crossGeoH = new THREE.PlaneGeometry(9, 14);
   for (const rx of roads) for (const rz of roads) {
-    const z = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), zebraMat);
-    z.rotation.x = -Math.PI / 2; z.position.set(rx, 0.07, rz); group.add(z);
+    const arms = [
+      { x: rx, z: rz - 10.5, geo: crossGeoV, mat: crossV },
+      { x: rx, z: rz + 10.5, geo: crossGeoV, mat: crossV },
+      { x: rx - 10.5, z: rz, geo: crossGeoH, mat: crossH },
+      { x: rx + 10.5, z: rz, geo: crossGeoH, mat: crossH },
+    ];
+    for (const a of arms) {
+      const m = new THREE.Mesh(a.geo, a.mat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(a.x, 0.07, a.z);
+      group.add(m);
+    }
   }
 
-  // --- Gedung per blok (hindari jalan) ---
-  const winTexWarm = windowTexture(true);
-  const winTexCool = windowTexture(false);
+  // --- Decal nama distrik di jalan (terbaca dari kamera atas) ---
+  const decals = [
+    { text: 'PELABUHAN VELA', sub: 'DERMAGA • FARO VELA', x: -240, z: -200, vertical: true, color: '#ff5d5d' },
+    { text: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
+    { text: 'PANTAI AZUL', sub: 'BOULEVARD MATAHARI', x: -240, z: 160, vertical: true, color: '#4cc9f0' },
+    { text: 'VELAMAR', sub: 'KOTA PELABUHAN', x: -40, z: 0, vertical: false, color: '#ffd23f' },
+  ];
+  for (const d of decals) {
+    const tex = groundDecalTexture(d.text, d.sub, d.color, d.vertical);
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(d.vertical ? 11 : 44, d.vertical ? 44 : 11),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(d.x, 0.08, d.z);
+    group.add(m);
+  }
+
+  // --- Gedung per blok (hindari jalan) — fasad ber-grid jendela + atap genteng hangat ---
+  const facades = [
+    facadeTexture('#ffd9a0', 0.7, 11),
+    facadeTexture('#ffb4a2', 0.65, 23),
+    facadeTexture('#ffe66d', 0.6, 37),
+    facadeTexture('#9fd8ff', 0.75, 51),
+  ];
   const blockCenters = [];
   for (let ix = -3; ix <= 3; ix++) for (let iz = -3; iz <= 3; iz++) {
     const cx = ix * WORLD.roadGap + WORLD.roadGap / 2;
@@ -190,77 +271,30 @@ export function buildCity(scene) {
       const ox = range(rng, -14, 14), oz = range(rng, -14, 14);
       const x = cx + ox, z = cz + oz;
       const isGlass = rng() < 0.25;
-      const color = isGlass ? pick(rng, PALETTE.glass) : pick(rng, PALETTE.building);
-      // Dinding ber-grid jendela menyala (tekstur canvas) — gedung terbaca dari atas & samping.
+      const tex = isGlass ? facades[3] : facades[Math.floor(rng() * 3)];
       const b = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshLambertMaterial({ color, map: isGlass ? winTexCool : winTexWarm }),
+        new THREE.MeshLambertMaterial({ map: tex, ...(isGlass ? { transparent: true, opacity: 0.94 } : {}) }),
       );
       b.position.set(x, h / 2, z);
       group.add(b);
-      // atap + detail atap (skylight / AC) supaya atap tidak polos dari atas
-      const roof = box(w + 1, 1, d + 1, 0x5a5a66, x, h + 0.5, z);
+      // atap genteng hangat + detail atap (AC / tangki air)
+      const roofColor = pick(rng, ROOF_COLORS);
+      const roof = box(w + 1, 1, d + 1, roofColor, x, h + 0.5, z);
       group.add(roof);
-      const roofN = 1 + Math.floor(rng() * 3);
-      for (let ri = 0; ri < roofN; ri++) {
-        const rw = range(rng, 3, 6), rd = range(rng, 3, 6);
-        const rx = x + range(rng, -w / 4, w / 4), rz = z + range(rng, -d / 4, d / 4);
-        const ac = box(rw, 1.2, rd, pick(rng, [0x8a8a96, 0xc8c8c8, 0x6a7a8a]), rx, h + 1.6, rz);
+      if (rng() < 0.5) {
+        const ac = box(3.5, 1.6, 3.5, 0x8a8f98, x + range(rng, -4, 4), h + 1.8, z + range(rng, -4, 4));
         group.add(ac);
+      } else {
+        const tank = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.6, 1.6, 2.4, 10),
+          new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }),
+        );
+        tank.position.set(x + range(rng, -4, 4), h + 2.2, z + range(rng, -4, 4));
+        group.add(tank);
       }
       colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
     }
-  }
-
-  // --- Signage toko di dinding gedung (nama usaha, terbaca dari jalan & atas) ---
-  const shopSigns = [
-    { lines: ['MOTEL VELA', 'VACANCY • COLD DRINKS'], x: -200, z: -100, ry: Math.PI / 2, color: '#ff5d8f' },
-    { lines: ['TACOS 24H', 'EL GATILLO'], x: 120, z: 60, ry: 0, color: '#ffd23f' },
-    { lines: ['PLAZA MERCADO', 'PASAR • KOPI'], x: 60, z: 140, ry: Math.PI, color: '#7ee081' },
-    { lines: ['SOL FM 95.4', 'SYNTHWAVE'], x: 160, z: -80, ry: -Math.PI / 2, color: '#4cc9f0' },
-    { lines: ['COMETA MOTORS', 'DEALER MOBIL'], x: 200, z: 100, ry: Math.PI, color: '#f72585' },
-    { lines: ['PANTAI AZUL', 'BOULEVARD MATAHARI'], x: -240, z: 160, ry: Math.PI / 2, color: '#4cc9f0' },
-  ];
-  for (const s of shopSigns) {
-    const tex = textTexture(s.lines, { color: s.color, bg: '#12233d' });
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(20, 10),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
-    );
-    sign.position.set(s.x, 9, s.z);
-    sign.rotation.y = s.ry;
-    group.add(sign);
-  }
-
-  // --- Properti pantai: payung, menara penjaga, handuk (pantai hidup, bukan pasir kosong) ---
-  const umbrellaColors = [0xff5d8f, 0x4cc9f0, 0xffd23f, 0x7ee081, 0xf72585];
-  for (let i = 0; i < 14; i++) {
-    const ux = range(rng, -268, -240), uz = range(rng, -260, 260);
-    if (Math.abs(uz + 190) < 24 && Math.abs(ux + 292) < 20) continue; // jangan tutupi dermaga
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.4, 6),
-      new THREE.MeshLambertMaterial({ color: 0xffffff }));
-    pole.position.set(ux, 1.7, uz); group.add(pole);
-    const top = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.2, 10),
-      new THREE.MeshLambertMaterial({ color: pick(rng, umbrellaColors) }));
-    top.position.set(ux, 3.8, uz); group.add(top);
-    const towel = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 4),
-      new THREE.MeshLambertMaterial({ color: pick(rng, umbrellaColors) }));
-    towel.rotation.x = -Math.PI / 2; towel.rotation.z = rng() * Math.PI;
-    towel.position.set(ux + range(rng, -3, 3), 0.06, uz + range(rng, -3, 3)); group.add(towel);
-  }
-  for (const tz of [-120, 40, 200]) {
-    const tower = new THREE.Group();
-    const legMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    for (const [lx, lz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4.5, 6), legMat);
-      leg.position.set(lx, 2.25, lz); tower.add(leg);
-    }
-    const cab = box(3.4, 2.2, 3.4, 0xff5d5d, 0, 5.4, 0); tower.add(cab);
-    const roofL = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.4, 4),
-      new THREE.MeshLambertMaterial({ color: 0xffd23f }));
-    roofL.position.y = 7.2; roofL.rotation.y = Math.PI / 4; tower.add(roofL);
-    tower.position.set(-256, 0, tz);
-    group.add(tower);
   }
 
   // --- Pohon palem di trotoar + lampu jalan ---
@@ -274,6 +308,34 @@ export function buildCity(scene) {
     trunk.position.set(rx, 3, rz); group.add(trunk);
     const top = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6), leafMat);
     top.position.set(rx, 6.8, rz); top.scale.y = 0.55; group.add(top);
+  }
+
+  // --- Pantai: 14 payung warna-warni + 3 menara penjaga ---
+  const umbrellaColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585];
+  for (let i = 0; i < 14; i++) {
+    const z = -300 + i * 46;
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 3.2, 6),
+      new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }),
+    );
+    pole.position.set(-272, 1.6, z); group.add(pole);
+    const top = new THREE.Mesh(
+      new THREE.ConeGeometry(2.6, 1.3, 8),
+      new THREE.MeshLambertMaterial({ color: umbrellaColors[i % umbrellaColors.length] }),
+    );
+    top.position.set(-272, 3.7, z); group.add(top);
+  }
+  for (const tz of [-100, 40, 220]) {
+    const tower = new THREE.Group();
+    for (const [lx, lz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) {
+      const leg = box(0.3, 4.4, 0.3, 0x8a6b3d, lx, 2.2, lz);
+      tower.add(leg);
+    }
+    const cabin = box(3.4, 2.2, 3.2, 0xffffff, 0, 5.4, 0);
+    const cabinRoof = box(4, 0.4, 3.8, 0xe63946, 0, 6.7, 0);
+    tower.add(cabin, cabinRoof);
+    tower.position.set(-268, 0, tz);
+    group.add(tower);
   }
 
   // --- Dermaga kayu di barat laut + mercusuar FARO VELA (landmark) ---
@@ -324,18 +386,41 @@ export function buildCity(scene) {
   boat.position.set(-310, 0.4, -200);
   group.add(boat);
 
-  // --- Nama distrik DICAT di tanah persimpangan (decal datar, terbaca dari
-  // atas seperti cover juara) — papan vertikal lama terlihat cermin/garis
-  // dari kamera top-down dan mengacaukan screenshot.
+  // --- Papan nama distrik (signage besar, terbaca dari jauh) ---
   for (const d of DISTRICTS) {
     const tex = textTexture([d.name, d.sub], { color: d.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(d.big ? 36 : 30, d.big ? 18 : 15),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
+      new THREE.PlaneGeometry(d.big ? 46 : 30, d.big ? 23 : 15),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
     );
-    sign.rotation.x = -Math.PI / 2; // rebah ke tanah, teks menghadap utara
-    sign.position.set(d.x, 0.09, d.z);
+    sign.position.set(d.x, d.big ? 26 : 20, d.z);
+    sign.rotation.y = Math.PI / 4;
     group.add(sign);
+    // tiang penyangga
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 0.6, d.big ? 16 : 12, 8),
+      new THREE.MeshLambertMaterial({ color: 0x333333 }),
+    );
+    pole.position.set(d.x, d.big ? 8 : 6, d.z);
+    group.add(pole);
+  }
+
+  // --- Papan toko (signage kecil di trotoar dekat toko) ---
+  for (const s of SHOP_SIGNS) {
+    const tex = textTexture([s.name, s.sub], { color: s.color, bg: '#12233d' });
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 10),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
+    );
+    sign.position.set(s.x, 12, s.z);
+    sign.rotation.y = Math.PI / 4;
+    group.add(sign);
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.4, 7, 8),
+      new THREE.MeshLambertMaterial({ color: 0x333333 }),
+    );
+    pole.position.set(s.x, 3.5, s.z);
+    group.add(pole);
   }
 
   // --- Plaza Mercado: air mancur kecil ---

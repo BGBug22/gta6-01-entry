@@ -1,5 +1,7 @@
 // Lalu lintas + pejalan kaki — mobil AI mengikuti jalan grid, pejalan kaki
-// berjalan di trotoar. Sederhana tapi hidup: berhenti kalau ada mobil di depan.
+// berjalan di trotoar. Pejalan kaki berdetail: topi, warna kulit bervariasi,
+// tinggi bervariasi, sebagian membawa ransel. Sederhana tapi hidup: berhenti
+// kalau ada mobil di depan, lari ketakutan kalau ada bahaya.
 import * as THREE from 'three';
 import { WORLD, CAR_MODELS } from './config.js';
 import { makeRng, pick, range, clamp } from './random.js';
@@ -56,14 +58,15 @@ export class TrafficCar {
   }
 }
 
-// Pejalan kaki: kapsul berwarna + kepala + topi/kunci variasi, jalan di trotoar.
-const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703, 0xff5d8f, 0x4cc9f0];
-const PED_SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
-const PED_HATS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, null, null];
+// Pejalan kaki berdetail: topi, warna kulit, tinggi, dan ransel bervariasi.
+const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703];
+const SKIN_TONES = [0xf1c27d, 0x8a5a2b, 0xe8b98a, 0x6b4423, 0xc68642];
+const HAT_COLORS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, 0xf72585];
 export class Pedestrian {
   constructor(scene, rng) {
     this.mesh = new THREE.Group();
     const color = pick(rng, PED_COLORS);
+    const skin = pick(rng, SKIN_TONES);
     const body = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.45, 1.0, 4, 8),
       new THREE.MeshLambertMaterial({ color }),
@@ -71,24 +74,28 @@ export class Pedestrian {
     body.position.y = 1.0; this.mesh.add(body);
     const head = new THREE.Mesh(
       new THREE.SphereGeometry(0.32, 10, 8),
-      new THREE.MeshLambertMaterial({ color: pick(rng, PED_SKINS) }),
+      new THREE.MeshLambertMaterial({ color: skin }),
     );
     head.position.y = 2.05; this.mesh.add(head);
-    // topi / variasi: ~60% bertopi, tinggi badan bervariasi
-    const hat = pick(rng, PED_HATS);
-    if (hat !== null) {
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.16, 10),
-        new THREE.MeshLambertMaterial({ color: hat }));
-      cap.position.y = 2.32; this.mesh.add(cap);
+    // topi (separuh pejalan kaki) — topi jerami / cap warna-warni
+    if (rng() < 0.5) {
+      const hat = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.46, 0.16, 10),
+        new THREE.MeshLambertMaterial({ color: pick(rng, HAT_COLORS) }),
+      );
+      hat.position.y = 2.32; this.mesh.add(hat);
     }
-    // ransel di sebagian pejalan kaki
-    if (rng() < 0.3) {
-      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.25),
-        new THREE.MeshLambertMaterial({ color: pick(rng, PED_COLORS) }));
-      pack.position.set(0, 1.2, -0.5); this.mesh.add(pack);
+    // ransel (40% pejalan kaki)
+    if (rng() < 0.4) {
+      const pack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.65, 0.28),
+        new THREE.MeshLambertMaterial({ color: pick(rng, HAT_COLORS) }),
+      );
+      pack.position.set(0, 1.15, -0.5); this.mesh.add(pack);
     }
-    const s = 0.88 + rng() * 0.28;
-    this.mesh.scale.set(s, s, s);
+    // tinggi bervariasi 0.9 – 1.12
+    const h = range(rng, 0.9, 1.12);
+    this.mesh.scale.set(1, h, 1);
     const x = range(rng, -WORLD.halfSize, WORLD.halfSize);
     const z = range(rng, -WORLD.halfSize, WORLD.halfSize);
     this.mesh.position.set(x, 0, z);
@@ -96,12 +103,14 @@ export class Pedestrian {
     this.speed = range(rng, 1.2, 2.2);
     this.fleeing = false;
     this.health = 100;
+    this.animT = 0; // jam animasi simulasi (BUKAN performance.now — harus deterministik)
     scene.add(this.mesh);
   }
   newTarget(rng) {
     return { x: range(rng, -WORLD.halfSize, WORLD.halfSize), z: range(rng, -WORLD.halfSize, WORLD.halfSize) };
   }
   update(dt, rng, danger) {
+    this.animT += dt;
     const p = this.mesh.position;
     // lari menjauh dari bahaya (tembakan / mobil ngebut dekat)
     let tx = this.target.x, tz = this.target.z;
@@ -115,8 +124,8 @@ export class Pedestrian {
     const sp = this.speed * (this.fleeing ? 2.6 : 1);
     p.x += (dx / d) * sp * dt; p.z += (dz / d) * sp * dt;
     this.mesh.rotation.y = Math.atan2(dx, dz);
-    // animasi jalan: goyang ringan
-    this.mesh.children[0].position.y = 1.0 + Math.abs(Math.sin(performance.now() * 0.008 + p.x)) * 0.08;
+    // animasi jalan: goyang ringan (jam simulasi — deterministik)
+    this.mesh.children[0].position.y = 1.0 + Math.abs(Math.sin(this.animT * 8 + p.x)) * 0.08;
   }
 }
 

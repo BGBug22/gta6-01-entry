@@ -1,5 +1,5 @@
-// Save — progres tersimpan di localStorage: uang, misi, senjata, mobil milik.
-// Muat di layar start ("Lanjutkan") atau mulai baru.
+// Save — progres tersimpan di localStorage: uang, misi, senjata, mobil milik,
+// dan upgrade garasi (mesin + armour). Muat di layar start ("Lanjutkan").
 import { GAME } from './config.js';
 
 export function loadSave() {
@@ -20,6 +20,7 @@ export function writeSave(state) {
       hasPistol: state.hasPistol,
       ammo: state.ammo,
       ownedCars: state.ownedCars,
+      upgrades: state.upgrades || { engine: 0, armour: 0 },
       savedAt: new Date().toISOString(),
     }));
   } catch { /* penyimpanan penuh / privat — main tetap jalan */ }

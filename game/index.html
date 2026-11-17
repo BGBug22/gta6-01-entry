@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>VELAMAR — Kota Pelabuhan Matahari | Make GTA 6</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1526;
+    font-family: Arial, Helvetica, sans-serif; color: #fff; }
+  #c { display: block; width: 100%; height: 100%; }
+  .panel { background: rgba(10, 20, 35, .72); border: 1px solid rgba(255, 210, 63, .45);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #hud-tl { position: fixed; top: 14px; left: 14px; z-index: 5; min-width: 230px; }
+  #health-bar { width: 200px; height: 14px; background: #222; border-radius: 7px; overflow: hidden; margin: 4px 0 2px; }
+  #health-fill { height: 100%; width: 100%; background: #7ee081; }
+  #health-num { font-size: 12px; color: #cfd8dc; }
+  #money { font-size: 22px; font-weight: bold; color: #7ee081; margin-top: 4px; }
+  #weapon-line { font-size: 12px; color: #ffd23f; margin-top: 2px; }
+  #hud-tr { position: fixed; top: 14px; right: 14px; z-index: 5; text-align: right; }
+  #stars { font-size: 30px; letter-spacing: 4px; color: #ffd23f; }
+  #wanted-label { font-size: 11px; letter-spacing: 2px; color: #ffb3b3; }
+  #hud-tc { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5;
+    text-align: center; max-width: 520px; }
+  #obj-title { font-size: 15px; font-weight: bold; color: #ffd23f; letter-spacing: 1px; }
+  #obj-text { font-size: 13px; color: #fff; margin-top: 2px; }
+  #timer { font-size: 26px; font-weight: bold; color: #ff5d5d; margin-top: 4px; display: none; }
+  #message { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6;
+    font-size: 22px; font-weight: bold; color: #ffd23f; text-shadow: 0 2px 8px #000;
+    opacity: 0; transition: opacity .3s; text-align: center; pointer-events: none; }
+  #prompt { position: fixed; bottom: 170px; left: 50%; transform: translateX(-50%); z-index: 5;
+    font-size: 16px; font-weight: bold; background: rgba(10,20,35,.8); padding: 8px 16px;
+    border-radius: 8px; border: 1px solid #ffd23f; display: none; }
+  #crosshair { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 5;
+    font-size: 22px; color: #ffd23f; display: none; text-shadow: 0 0 6px #000; }
+  #minimap-wrap { position: fixed; right: 14px; bottom: 14px; z-index: 5; }
+  #minimap { width: 190px; height: 190px; border-radius: 10px; display: block; }
+  #minimap-label { text-align: center; font-size: 11px; letter-spacing: 2px; color: #ffd23f; padding-top: 3px; }
+  #speed { position: fixed; right: 220px; bottom: 20px; z-index: 5; text-align: right; display: none; }
+  #speed-num { font-size: 44px; font-weight: bold; color: #fff; text-shadow: 0 2px 8px #000; }
+  #speed-unit { font-size: 13px; color: #ffd23f; }
+  #controls { position: fixed; left: 14px; bottom: 14px; z-index: 5; font-size: 12px;
+    line-height: 1.7; color: #dfe9f5; }
+  #controls b { color: #ffd23f; }
+  #screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; background: rgba(5, 12, 24, .82); }
+  #screen-box { text-align: center; max-width: 640px; padding: 36px 44px; }
+  #screen-title { font-size: 52px; font-weight: bold; color: #ffd23f; letter-spacing: 4px;
+    text-shadow: 0 4px 0 #b8860b, 0 8px 24px rgba(0,0,0,.7); }
+  #screen-sub { font-size: 15px; color: #4cc9f0; letter-spacing: 3px; margin-top: 4px; }
+  #screen-text { font-size: 16px; line-height: 1.7; color: #eaf2ff; margin: 18px 0 22px; }
+  #screen-btn { font-size: 19px; font-weight: bold; color: #12233d; background: #ffd23f;
+    border: none; border-radius: 10px; padding: 14px 38px; cursor: pointer; letter-spacing: 1px; }
+  #screen-btn:hover { background: #ffe66d; }
+  #screen-foot { margin-top: 16px; font-size: 12px; color: #8fa3b8; line-height: 1.6; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud-tl" class="panel">
+  <div style="font-size:11px;letter-spacing:2px;color:#8fa3b8">VELAMAR • KESEHATAN</div>
+  <div id="health-bar"><div id="health-fill"></div></div>
+  <div id="health-num">100</div>
+  <div id="money">$50</div>
+  <div id="weapon-line">✊ Tangan kosong — tekan 2 untuk pistol</div>
+</div>
+
+<div id="hud-tr">
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="wanted-label">WANTED LEVEL</div>
+</div>
+
+<div id="hud-tc" class="panel">
+  <div id="obj-title">VELAMAR</div>
+  <div id="obj-text">Tekan M untuk misi berikutnya.</div>
+  <div id="timer">0:00</div>
+</div>
+
+<div id="message"></div>
+<div id="prompt"></div>
+<div id="crosshair">＋</div>
+
+<div id="minimap-wrap" class="panel">
+  <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="minimap-label">VELAMAR • FARO VELA ▲</div>
+</div>
+
+<div id="speed"><span id="speed-num">0</span> <span id="speed-unit">km/jam</span></div>
+
+<div id="controls" class="panel">
+  <b>WASD</b> jalan / nyetir &nbsp; <b>Mouse</b> putar kamera<br>
+  <b>E</b> masuk / keluar mobil &nbsp; <b>Shift</b> lari<br>
+  <b>F</b> pukul &nbsp; <b>Klik</b> tembak &nbsp; <b>1/2</b> senjata<br>
+  <b>M</b> misi &nbsp; <b>T</b> taksi &nbsp; <b>B</b> beli &nbsp; <b>P</b> jeda
+</div>
+
+<div id="screen">
+  <div id="screen-box">
+    <div id="screen-title">VELAMAR</div>
+    <div id="screen-sub">KOTA PELABUHAN MATAHARI • 8 MISI • 3 HARI</div>
+    <div id="screen-text"></div>
+    <button id="screen-btn">MULAI MAIN</button>
+    <div id="screen-foot"></div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

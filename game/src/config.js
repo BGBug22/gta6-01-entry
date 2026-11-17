@@ -22,11 +22,26 @@ export const DISTRICTS = [
 ];
 
 export const PALETTE = {
-  sky: 0x7ec8f7, fog: 0xaadcf7, sun: 0xfff2c9,
-  road: 0x3a3f4a, roadLine: 0xf5f0dc, sidewalk: 0xb9b3a4, sand: 0xf2d8a0, sea: 0x1e90c8,
+  sky: 0x8ec9ee, fog: 0xf2cf9e, sun: 0xffe9b8,
+  road: 0x4a4038, roadLine: 0xffe9a8, sidewalk: 0xd8c39a, sand: 0xf7dd9e, sea: 0x2aa8c9,
+  ground: 0xcf9f66,
   building: [0xffd9a0, 0xffb4a2, 0xa0e7ff, 0xc8f7c5, 0xffe66d, 0xf7aef8, 0xffffff, 0xffc6ff],
   glass: [0x9fd8ff, 0x7ec8f7, 0xbde0fe],
 };
+
+// Dialog satu baris per misi — muncul di bar dialog HUD saat misi aktif.
+export const DIALOGUE = {
+  1: 'MARA: Paketnya jangan dibuka. Antar ke Plaza Mercado, cepat!',
+  2: 'MARA: Penumpang menunggu di Pantai Azul. Jangan bikin dia lama.',
+  3: 'RICO: Empat gerbang, satu jalan. Tunjukkan Cometa GT itu bisa apa.',
+  4: 'MARA: Cometa GT merah muda itu milik kita sekarang. Ambil diam-diam.',
+  5: 'RICO: Bikin polisi panas 3 bintang — lalu hilang seperti asap.',
+  6: 'MARA: Paket panas di tangan. Dermaga, sekarang, jangan berhenti!',
+  7: 'RICO: Tiga preman dermaga menghadang. Habisi mereka semua.',
+  8: 'MARA: Kapal menunggu di ujung dermaga. Polisi 4 bintang di belakangmu — LARIKAN!',
+};
+
+export const RADIO = { station: 'SOL FM', freq: '95.4', track: 'SYNTHWAVE' };
 
 // Kendaraan yang bisa dicuri / dibeli. speed = m/detik, accel, harga beli.
 export const CAR_MODELS = [

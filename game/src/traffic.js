@@ -56,8 +56,10 @@ export class TrafficCar {
   }
 }
 
-// Pejalan kaki: kapsul berwarna, jalan di trotoar dari titik ke titik.
-const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703];
+// Pejalan kaki: kapsul berwarna + kepala + topi/kunci variasi, jalan di trotoar.
+const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703, 0xff5d8f, 0x4cc9f0];
+const PED_SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
+const PED_HATS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, null, null];
 export class Pedestrian {
   constructor(scene, rng) {
     this.mesh = new THREE.Group();
@@ -69,9 +71,24 @@ export class Pedestrian {
     body.position.y = 1.0; this.mesh.add(body);
     const head = new THREE.Mesh(
       new THREE.SphereGeometry(0.32, 10, 8),
-      new THREE.MeshLambertMaterial({ color: 0xf1c27d }),
+      new THREE.MeshLambertMaterial({ color: pick(rng, PED_SKINS) }),
     );
     head.position.y = 2.05; this.mesh.add(head);
+    // topi / variasi: ~60% bertopi, tinggi badan bervariasi
+    const hat = pick(rng, PED_HATS);
+    if (hat !== null) {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.16, 10),
+        new THREE.MeshLambertMaterial({ color: hat }));
+      cap.position.y = 2.32; this.mesh.add(cap);
+    }
+    // ransel di sebagian pejalan kaki
+    if (rng() < 0.3) {
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.25),
+        new THREE.MeshLambertMaterial({ color: pick(rng, PED_COLORS) }));
+      pack.position.set(0, 1.2, -0.5); this.mesh.add(pack);
+    }
+    const s = 0.88 + rng() * 0.28;
+    this.mesh.scale.set(s, s, s);
     const x = range(rng, -WORLD.halfSize, WORLD.halfSize);
     const z = range(rng, -WORLD.halfSize, WORLD.halfSize);
     this.mesh.position.set(x, 0, z);

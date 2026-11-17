@@ -1,11 +1,17 @@
-// HUD — semua elemen layar: health, wanted stars, uang, objektif misi, timer,
-// kecepatan, pesan tengah, prompt tombol, layar start / pause / misi / kalah.
+// HUD — semua elemen layar: health, armour, wanted stars, uang, senjata+ammo,
+// respect level, objektif misi, jarak tujuan, jam hari, dialog, radio, kecepatan,
+// pesan tengah, prompt tombol, layar start / pause / misi / kalah.
+import { wantedStars, wantedLabelFor } from './wanted-level.js';
+
 export class Hud {
   constructor() {
     this.el = {};
-    for (const id of ['health-fill', 'health-num', 'money', 'stars', 'objective', 'obj-title',
-      'obj-text', 'timer', 'speed', 'speed-num', 'message', 'prompt', 'crosshair',
-      'screen', 'screen-title', 'screen-text', 'screen-btn', 'controls', 'minimap-wrap']) {
+    for (const id of ['health-fill', 'health-num', 'armour-fill', 'armour-num', 'money',
+      'weapon-line', 'respect-line', 'respect-fill', 'district', 'clock', 'stars',
+      'wanted-label', 'district-label', 'objective', 'obj-title', 'obj-text', 'distance',
+      'timer', 'speed', 'speed-num', 'car-name', 'message', 'dialogue', 'radio', 'prompt',
+      'crosshair', 'screen', 'screen-title', 'screen-text', 'screen-btn', 'controls',
+      'minimap-wrap']) {
       this.el[id] = document.getElementById(id);
     }
     this.messageTimer = 0;
@@ -15,17 +21,37 @@ export class Hud {
     this.el['health-fill'].style.background = h > 50 ? '#7ee081' : h > 25 ? '#ffd23f' : '#ff5d5d';
     this.el['health-num'].textContent = Math.ceil(Math.max(0, h));
   }
+  setArmour(a) {
+    this.el['armour-fill'].style.width = `${Math.max(0, Math.min(100, a))}%`;
+    this.el['armour-num'].textContent = `ARMOUR ${Math.ceil(Math.max(0, a))}`;
+  }
+  setRespect(lv, pct) {
+    this.el['respect-line'].textContent = `RESPECT LV ${lv}`;
+    this.el['respect-fill'].style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+  setWeaponLabel(text) { this.el['weapon-line'].textContent = text; }
+  setClock(day, hh, mm) {
+    this.el.clock.textContent = `DAY ${day} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  }
+  setDistrict(name) {
+    this.el.district.textContent = name;
+    this.el['district-label'].textContent = name;
+  }
   setMoney(m) { this.el.money.textContent = `$${m.toLocaleString('en-US')}`; }
   setWanted(n) {
-    let s = '';
-    for (let i = 0; i < 5; i++) s += i < n ? '★' : '☆';
-    this.el.stars.textContent = s;
+    this.el.stars.textContent = wantedStars(n);
     this.el.stars.style.color = n >= 3 ? '#ff5d5d' : '#ffd23f';
     this.el.stars.style.textShadow = n > 0 ? '0 0 12px rgba(255,93,93,.9)' : 'none';
+    this.el['wanted-label'].textContent = `WANTED LEVEL • ${wantedLabelFor(n)}`;
   }
   setObjective(title, text) {
     this.el['obj-title'].textContent = title || 'VELAMAR';
     this.el['obj-text'].textContent = text || 'Tekan M untuk misi berikutnya.';
+  }
+  setDistance(text) { this.el.distance.textContent = text || ''; }
+  setDialogue(html) {
+    if (html) { this.el.dialogue.innerHTML = html; this.el.dialogue.style.display = 'block'; }
+    else this.el.dialogue.style.display = 'none';
   }
   setTimer(sec) {
     if (sec > 0) {
@@ -34,9 +60,12 @@ export class Hud {
       this.el.timer.style.display = 'block';
     } else this.el.timer.style.display = 'none';
   }
-  setSpeed(kmh, inCar) {
+  setSpeed(kmh, inCar, carName) {
     this.el.speed.style.display = inCar ? 'block' : 'none';
-    if (inCar) this.el['speed-num'].textContent = Math.round(kmh);
+    if (inCar) {
+      this.el['speed-num'].textContent = Math.round(kmh);
+      this.el['car-name'].textContent = carName || '';
+    }
   }
   showMessage(text, dur = 3) {
     this.el.message.textContent = text;

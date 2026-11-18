@@ -162,13 +162,13 @@ export function buildCity(scene) {
   const grad = sg.createLinearGradient(0, 0, 0, 512);
   // Gradien dikompres supaya oranye SUDAH muncul di langit yang terlihat
   // dari kamera chase (pita langit di atas horizon = canvas 0..0.41):
-  // ungu di atas, pink di tengah, oranye-emas di dekat horizon.
-  grad.addColorStop(0.0, '#241a55');
-  grad.addColorStop(0.18, '#5b3a8c');
-  grad.addColorStop(0.30, '#b0528f');
-  grad.addColorStop(0.38, '#ff7a4d');
-  grad.addColorStop(0.48, '#ffb347');
-  grad.addColorStop(0.60, '#ffe0a0');
+  // ungu DALAM di atas, pink di tengah, oranye-emas di dekat horizon.
+  grad.addColorStop(0.0, '#1c1248');
+  grad.addColorStop(0.12, '#4a2f7e');
+  grad.addColorStop(0.22, '#a04a8a');
+  grad.addColorStop(0.32, '#ff6a4d');
+  grad.addColorStop(0.40, '#ffb347');
+  grad.addColorStop(0.50, '#ffe0a0');
   grad.addColorStop(1.0, '#ffe0a0');
   sg.fillStyle = grad; sg.fillRect(0, 0, 4, 512);
   const skyTex = new THREE.CanvasTexture(skyCanvas);
@@ -179,19 +179,21 @@ export function buildCity(scene) {
   );
   scene.add(skyDome);
   scene.background = new THREE.Color(PALETTE.sky);
-  // Matahari senja rendah di barat (di atas laut) + lingkaran cahayanya.
+  // Matahari senja rendah di barat-laut (di atas laut) + lingkaran cahayanya.
+  // Posisinya di utara-barat supaya masuk frame kamera chase pantai
+  // (yaw ~0.95, memandang barat-laut): cakram terlihat di langit kiri-atas.
   const sunDisc = new THREE.Mesh(
     new THREE.CircleGeometry(55, 24),
-    new THREE.MeshBasicMaterial({ color: 0xfff3b0, fog: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffe066, fog: false }),
   );
-  sunDisc.position.set(-1000, 130, -150);
+  sunDisc.position.set(-1000, 120, -350);
   sunDisc.rotation.y = Math.PI / 2;
   scene.add(sunDisc);
   const sunGlow = new THREE.Mesh(
     new THREE.CircleGeometry(120, 24),
     new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.35, fog: false }),
   );
-  sunGlow.position.set(-1010, 130, -150);
+  sunGlow.position.set(-1010, 120, -350);
   sunGlow.rotation.y = Math.PI / 2;
   scene.add(sunGlow);
   // Kabut hangat oranye — kota jauh larut dalam senja.
@@ -215,7 +217,8 @@ export function buildCity(scene) {
   ground.position.set(40, -0.05, 0);
   group.add(ground);
 
-  // --- Laut (barat) + pantai pasir ---
+  // --- Laut (barat) + pantai pasir (LEBAR — pasir menyentuh tepi jalan
+  // pantai supaya pantai terbaca dari kamera chase, bukan strip jauh) ---
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(320, H * 2 + 200),
     new THREE.MeshLambertMaterial({ color: PALETTE.sea }),
@@ -224,7 +227,7 @@ export function buildCity(scene) {
   sea.position.set(WORLD.seaX - 130, 0.02, 0);
   group.add(sea);
   const sand = new THREE.Mesh(
-    new THREE.PlaneGeometry(34, H * 2 + 200),
+    new THREE.PlaneGeometry(50, H * 2 + 200),
     new THREE.MeshLambertMaterial({ color: PALETTE.sand }),
   );
   sand.rotation.x = -Math.PI / 2;
@@ -344,17 +347,46 @@ export function buildCity(scene) {
     }
   }
 
-  // --- Pohon palem di trotoar + lampu jalan ---
+  // --- Pohon PALEM (bukan pohon bulat) di trotoar + barisan palem pantai ---
+  // Palem = penanda visual "kota pesisir cerah" yang paling konsisten di
+  // top 10: batang ramping + 4 pelepah menjuntai. Geometri dibagi (shared)
+  // supaya 100+ palem tidak membengkak: 5 mesh per palem.
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
   const leafMat = new THREE.MeshLambertMaterial({ color: 0x2fae5f });
+  const palmTrunkGeo = new THREE.CylinderGeometry(0.22, 0.42, 8, 6);
+  const palmFrondGeo = new THREE.BoxGeometry(5.2, 0.12, 1.3);
+  function makePalm(x, z, h, lean) {
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(palmTrunkGeo, trunkMat);
+    trunk.scale.y = h / 8;
+    trunk.position.y = h / 2;
+    trunk.rotation.z = lean;
+    g.add(trunk);
+    for (let k = 0; k < 4; k++) {
+      const holder = new THREE.Group();
+      holder.position.y = h;
+      holder.rotation.y = (k * Math.PI) / 2 + 0.4;
+      const frond = new THREE.Mesh(palmFrondGeo, leafMat);
+      frond.position.set(2.3, -0.7, 0);
+      frond.rotation.z = -0.5; // menjuntai ke bawah
+      holder.add(frond);
+      g.add(holder);
+    }
+    g.position.set(x, 0, z);
+    return g;
+  }
   for (let i = 0; i < 90; i++) {
     const rx = roads[Math.floor(rng() * roads.length)] + (rng() < 0.5 ? -11 : 11);
     const rz = range(rng, -H, H);
     if (rx < WORLD.beachX + 8) continue;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 6, 6), trunkMat);
-    trunk.position.set(rx, 3, rz); group.add(trunk);
-    const top = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6), leafMat);
-    top.position.set(rx, 6.8, rz); top.scale.y = 0.55; group.add(top);
+    group.add(makePalm(rx, rz, 7 + (i % 3), (i % 5) * 0.02 - 0.04));
+  }
+  // Barisan palem di promenade pantai (x=-263, di atas pasir, tiap 20 m) —
+  // pagar hijau jalan pantai yang terlihat di cover. Jitter deterministik
+  // dari lcg lokal (bukan rng kota) supaya urutan acak kota tidak bergeser.
+  const pj = lcg(99);
+  for (let z = -320; z <= 320; z += 20) {
+    group.add(makePalm(-263 + (pj() - 0.5) * 6, z + (pj() - 0.5) * 8, 8, (pj() - 0.5) * 0.08));
   }
 
   // --- Pantai: 14 payung warna-warni + 3 menara penjaga ---

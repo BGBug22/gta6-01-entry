@@ -43,15 +43,29 @@
   #stars .star-on { color: #ffd23f; }
   #stars.hot .star-on { color: #ff5d5d; }
   #stars .star-off { color: rgba(255,255,255,.45); }
-  #wanted-label { font-size: 11px; letter-spacing: 2px; color: #ffb3b3; margin-top: 4px; }
+  #wanted-label { font-size: 11px; letter-spacing: 2px; color: #ffd23f; margin-top: 4px;
+    background: rgba(10, 20, 35, .78); display: inline-block; padding: 3px 9px; border-radius: 4px;
+    border: 1px solid rgba(255, 210, 63, .5); font-weight: bold; }
   #money { font-size: 24px; font-weight: bold; color: #7ee081; margin-top: 6px;
     text-shadow: 0 2px 0 #000, 0 0 10px rgba(0,0,0,.8); }
   #weapon-line { font-size: 13px; font-weight: bold; color: #ffd23f; margin-top: 3px;
     text-shadow: 0 1px 0 #000, 0 0 8px rgba(0,0,0,.8); }
+  /* Bar slot senjata 4 buah (ala juara): kotak kecil, slot aktif berbingkai emas. */
+  #weapon-slots { display: none; margin-top: 6px; gap: 5px; justify-content: flex-end; }
+  #weapon-slots.on { display: inline-flex; }
+  .wslot { width: 62px; padding: 4px 2px 3px; background: rgba(10, 20, 35, .78);
+    border: 1px solid rgba(255,255,255,.35); border-radius: 6px; text-align: center; }
+  .wslot.active { border: 2px solid #ffd23f; background: rgba(255, 210, 63, .22); }
+  .wslot.locked { opacity: .45; }
+  .wslot .w-icon { font-size: 15px; line-height: 1; }
+  .wslot .w-name { font-size: 9px; font-weight: bold; letter-spacing: 1px; color: #fff; margin-top: 2px; }
+  .wslot .w-ammo { font-size: 10px; font-weight: bold; color: #7ee081; }
+  .wslot .w-key { font-size: 9px; color: #8fa3b8; }
   #clock { font-size: 15px; font-weight: bold; color: #fff; margin-top: 8px; letter-spacing: 1px;
     text-shadow: 0 1px 0 #000; }
-  #controls { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 5;
-    font-size: 12px; color: #dfe9f5; padding: 6px 14px; white-space: nowrap; }
+  /* Strip kontrol di tepi BAWAH (kecil, ala juara) — bukan tengah-atas. */
+  #controls { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 5;
+    font-size: 11px; color: #dfe9f5; padding: 3px 12px; white-space: nowrap; opacity: .85; }
   #controls b { color: #ffd23f; }
   #message { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6;
     font-size: 22px; font-weight: bold; color: #ffd23f; text-shadow: 0 2px 8px #000;
@@ -78,7 +92,7 @@
   #health-num, #armour-num { font-size: 11px; color: #cfd8dc; }
   #armour-num { color: #9fd8ff; }
   #respect-line { font-size: 11px; font-weight: bold; color: #ffe66d; margin-top: 4px; }
-  #dialogue { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 5;
+  #dialogue { position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%); z-index: 5;
     display: none; align-items: center; gap: 12px; max-width: 600px; }
   #dialogue-portrait { width: 64px; height: 64px; border-radius: 8px; flex-shrink: 0;
     border: 2px solid #ffd23f; }
@@ -143,7 +157,8 @@
   <div id="stars"><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span></div>
   <div id="wanted-label">WANTED LEVEL</div>
   <div id="money">$50</div>
-  <div id="weapon-line">✊ Tangan kosong — beli pistol di Toko Senjata ($150)</div>
+  <div id="weapon-line">✊ TANGAN KOSONG</div>
+  <div id="weapon-slots"></div>
   <div id="clock">DAY 1 18:24</div>
 </div>
 

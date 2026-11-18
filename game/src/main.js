@@ -413,9 +413,9 @@ class Game {
     if (w === 'pistol' && this.combat.hasPistol) {
       this.hud.setWeapon(`🔫 ${GAME.pistolName} — ${this.combat.ammo}/${GAME.pistolAmmoMax}`);
     } else if (this.combat.hasPistol) {
-      this.hud.setWeapon(`✊ Tangan kosong — tekan 2 untuk pistol (${this.combat.ammo}/${GAME.pistolAmmoMax})`);
+      this.hud.setWeapon('✊ TANGAN KOSONG');
     } else {
-      this.hud.setWeapon('✊ Tangan kosong — beli pistol di Toko Senjata ($150)');
+      this.hud.setWeapon('✊ TANGAN KOSONG');
     }
   }
 

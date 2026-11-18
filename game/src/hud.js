@@ -15,7 +15,8 @@ export class Hud {
       'condition-fill', 'condition-num',
       'speed', 'speed-num', 'speed-unit', 'car-name', 'radio',
       'message', 'prompt', 'crosshair', 'shop', 'shop-title', 'shop-money', 'shop-items', 'shop-hint',
-      'screen', 'screen-title', 'screen-text', 'screen-btn', 'controls', 'minimap-wrap']) {
+      'screen', 'screen-title', 'screen-text', 'screen-btn', 'controls', 'minimap-wrap',
+      'weapon-slots']) {
       this.el[id] = document.getElementById(id);
     }
     this.messageTimer = 0;
@@ -45,6 +46,32 @@ export class Hud {
     this.el['respect-fill'].style.width = `${(level / 5) * 100}%`;
   }
   setWeapon(text) { this.el['weapon-line'].textContent = text; }
+  // Bar slot senjata 4 buah (ala juara): [{icon, name, ammo, active, locked, key}]
+  // ammo = teks di bawah nama ('24/120', '∞', atau '🔒'); locked = slot terkunci.
+  setWeaponSlots(slots) {
+    const box = this.el['weapon-slots'];
+    if (!slots || !slots.length) { box.className = ''; box.innerHTML = ''; return; }
+    box.className = 'on';
+    box.innerHTML = '';
+    slots.forEach((s, i) => {
+      const d = document.createElement('div');
+      d.className = 'wslot' + (s.active ? ' active' : '') + (s.locked ? ' locked' : '');
+      const ic = document.createElement('div');
+      ic.className = 'w-icon';
+      ic.textContent = s.icon;
+      const nm = document.createElement('div');
+      nm.className = 'w-name';
+      nm.textContent = s.name;
+      const am = document.createElement('div');
+      am.className = 'w-ammo';
+      am.textContent = s.locked ? '🔒' : s.ammo;
+      const ky = document.createElement('div');
+      ky.className = 'w-key';
+      ky.textContent = `${i + 1}`;
+      d.appendChild(ic); d.appendChild(nm); d.appendChild(am); d.appendChild(ky);
+      box.appendChild(d);
+    });
+  }
   setObjective(title, text) {
     this.el['obj-title'].textContent = title || 'VELAMAR';
     this.el['obj-text'].textContent = text || 'Tekan M untuk misi berikutnya.';

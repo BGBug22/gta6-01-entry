@@ -15,14 +15,15 @@ export class Minimap {
     const toMap = (x, z) => [((x + H) / (2 * H)) * S, ((z + H) / (2 * H)) * S];
     this.t += 0.016;
     // latar: darat + laut — warna TERANG supaya terbaca di lingkaran kecil
-    ctx.fillStyle = '#6f8f5f'; ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = '#8fb573'; ctx.fillRect(0, 0, S, S);
     const [seaX] = toMap(WORLD.seaX - 160, 0);
     ctx.fillStyle = '#2f9fd8'; ctx.fillRect(0, 0, Math.max(0, seaX), S);
-    ctx.fillStyle = '#f2d8a0';
+    // pantai pasir LEBAR + terang — garis pantai terbaca sekali lirik
+    ctx.fillStyle = '#ffe9b0';
     const [bx] = toMap(WORLD.beachX, 0);
-    ctx.fillRect(Math.max(0, bx) - 4, 0, 5, S);
-    // jalan grid
-    ctx.strokeStyle = '#e8e0c8'; ctx.lineWidth = 3;
+    ctx.fillRect(Math.max(0, bx) - 5, 0, 8, S);
+    // jalan grid — PUTIH TEBAL supaya terbaca di lingkaran kecil
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
     for (let i = -4; i <= 4; i++) {
       const [x1, y1] = toMap(i * WORLD.roadGap, -H);
       const [x2, y2] = toMap(i * WORLD.roadGap, H);
@@ -60,6 +61,13 @@ export class Minimap {
     }
     // pemain: panah kuning BESAR searah hadap
     const [px, py] = toMap(state.player.x, state.player.z);
+    // zona pencarian merah (ala juara) saat polisi mengejar
+    if (state.police && state.police.length > 0) {
+      ctx.strokeStyle = '#ff5d5d'; ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.arc(px, py, 30, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(Math.atan2(Math.sin(state.player.heading), Math.cos(state.player.heading)) * -1 + Math.PI);

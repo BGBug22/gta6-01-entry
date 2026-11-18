@@ -64,7 +64,7 @@ class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1500);
+    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 1500);
     this.input = new Input(canvas);
     this.hud = new Hud();
     this.minimap = new Minimap(document.getElementById('minimap'));
@@ -78,9 +78,8 @@ class Game {
     this.upgrades = { engine: 0, armour: 0 }; // upgrade garasi: mesin + armour maks
     this.maxArmour = ARMOUR.max;
     this.carSpeedMul = 1;
-    this.topDown = false; // kamera atas (mode screenshot)
-    this.topDownHeight = 240;
-    this.topDownOffset = { x: 0, z: 0 };
+    this.shotCam = null; // mode screenshot chase: { dist, height, ahead, lookY }
+    this.carCondition = 100; // kondisi mobil 0–100 (turun saat ditabrak polisi)
     this.money = GAME.startMoney;
     this.respect = 1;
     this.clockDay = CLOCK.day;
@@ -93,7 +92,7 @@ class Game {
     this.taxiFare = null;
     this.taxiPassenger = null;
     this.cameraYaw = Math.PI;
-    this.cameraPitch = 0.3;
+    this.cameraPitch = 0.22;
     this.camDist = 10;
 
     const { colliders } = buildCity(this.scene);
@@ -285,7 +284,7 @@ class Game {
       this.sound.horn();
     }
     // taksi: penumpang ikut kalau misi taksi aktif
-    this.camDist = 13;
+    this.camDist = 11.5;
   }
   exitCar() {
     const p = this.player;
@@ -640,6 +639,21 @@ class Game {
     this.hud.setRadio(`🎵 ${station.name} ${station.freq} — ${station.style}`);
     this.hud.setSpeed(p.inCar ? p.car.kmh() : 0, p.inCar);
     this.hud.setCarName(p.inCar ? p.car.model.name : '');
+    // --- panel respons polisi (unit bernama + jarak + taktik) ---
+    this.hud.setPolice(this.police.wanted > 0 ? this.police.units(p.pos) : []);
+    // --- tahap misi + langkah berikutnya (kartu misi) ---
+    const si = this.missions.stageInfo();
+    this.hud.setStage(si ? si.stage : null, si ? si.next : null);
+    // --- kondisi mobil: rusak saat ditabrak polisi, pulih saat aman ---
+    if (p.inCar) {
+      let rammed = false;
+      for (const pc of this.police.cars) {
+        if (Math.hypot(pc.pos.x - p.pos.x, pc.pos.z - p.pos.z) < 7) { rammed = true; break; }
+      }
+      if (rammed) this.carCondition = Math.max(45, this.carCondition - 4 * dt);
+      else if (this.police.wanted === 0) this.carCondition = Math.min(100, this.carCondition + 1.5 * dt);
+      this.hud.setCondition(this.carCondition);
+    }
     this.hud.setCrosshair(!p.inCar && this.combat.weapon === 'pistol' && this.combat.hasPistol);
     this.hud.update(dt);
     this.minimap.draw({
@@ -720,14 +734,23 @@ class Game {
 
   updateCamera(dt) {
     const p = this.player;
-    if (this.topDown) {
-      // Kamera atas: lurus ke bawah, utara (-z) di atas layar, jalan sejajar sumbu.
+    if (this.shotCam) {
+      // Kamera chase untuk screenshot: rendah di belakang mobil/pemain,
+      // menghadap ke arah jalan — seperti cover juara (street-level 3D).
+      // Deterministik: hanya dari posisi + heading, tanpa performance.now.
+      // side = geser kamera ke kanan (+) / kiri (-) dari sumbu mobil.
+      // yaw = putar arah pandang (positif = ke kiri, ke arah laut di pantai).
       const target = p.inCar ? p.car.pos : p.pos;
-      const tx = target.x + this.topDownOffset.x;
-      const tz = target.z + this.topDownOffset.z;
-      this.camera.up.set(0, 0, -1);
-      this.camera.position.set(tx, this.topDownHeight, tz + 0.01);
-      this.camera.lookAt(tx, 0, tz);
+      const heading = p.inCar ? p.car.heading : p.heading;
+      const fx = Math.sin(heading), fz = Math.cos(heading);
+      const rx = -Math.cos(heading), rz = Math.sin(heading); // kanan
+      const c = this.shotCam;
+      const side = c.side || 0;
+      const yaw = c.yaw || 0;
+      const lx = Math.sin(heading + yaw), lz = Math.cos(heading + yaw);
+      this.camera.up.set(0, 1, 0);
+      this.camera.position.set(target.x - fx * c.dist + rx * side, c.height, target.z - fz * c.dist + rz * side);
+      this.camera.lookAt(target.x + lx * c.ahead, c.lookY, target.z + lz * c.ahead);
       return;
     }
     this.camera.up.set(0, 1, 0);

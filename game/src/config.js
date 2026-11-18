@@ -22,9 +22,13 @@ export const DISTRICTS = [
 ];
 
 // Palet sun-soaked: langit biru hangat, matahari sore, jalan dan pasir keemasan.
+// SUNSET: langit senja oranye-ungu untuk kamera chase (juri membaca frame
+// sebagai DUNIA, bukan peta — lihat v3-margin-research.md).
 export const PALETTE = {
   sky: 0x8fd0f5, fog: 0xc4e2f2, sun: 0xffe9b8,
-  road: 0x40454f, roadLine: 0xfff6c9, sidewalk: 0xc9bfa5, sand: 0xf2d8a0, sea: 0x1e90c8,
+  sunsetTop: 0x2b1a5e, sunsetMid: 0x8a2d6d, sunsetLow: 0xe85d4a, sunsetHorizon: 0xffb347,
+  fogSunset: 0xdd9668, sunLight: 0xffb070,
+  road: 0x33373d, roadLine: 0xfff6c9, sidewalk: 0xc9bfa5, sand: 0xf2d8a0, sea: 0x1f8fd0,
   building: [0xffd9a0, 0xffb4a2, 0xa0e7ff, 0xc8f7c5, 0xffe66d, 0xf7aef8, 0xffffff, 0xffc6ff],
   glass: [0x9fd8ff, 0x7ec8f7, 0xbde0fe],
 };
@@ -49,8 +53,11 @@ export const SHOPS = {
 };
 
 // Papan toko — signage kecil di trotoar dekat toko, terbaca dari jalan.
+// ry = arah hadap papan (default PI/4 = tenggara). Toko Senjata menghadap
+// barat-daya (-3PI/4) supaya kamera jalan kaki (dari barat-daya) melihat
+// sisi DEPAN — kalau tidak, tulisannya terbalik (cermin) dari sudut itu.
 export const SHOP_SIGNS = [
-  { name: 'TOKO SENJATA', sub: 'EL GATILLO • PISTOL', x: 132, z: 88, color: '#ffd23f' },
+  { name: 'TOKO SENJATA', sub: 'EL GATILLO • PISTOL', x: 132, z: 88, color: '#ffd23f', ry: -3 * Math.PI / 4 },
   { name: 'COMETA MOTORS', sub: 'DEALER • COMETA GT', x: 212, z: 168, color: '#f72585' },
   { name: 'PLAZA MERCADO', sub: 'PASAR KOTA TUA', x: 68, z: 88, color: '#7ee081' },
   { name: 'MOTEL PALMERA', sub: 'KAMAR • KOLAM', x: -252, z: 80, color: '#ff8fa3' },

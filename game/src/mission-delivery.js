@@ -53,6 +53,28 @@ export class MissionSystem {
 
   current() { return MISSIONS[this.index] || null; }
 
+  // Info tahap misi untuk kartu HUD: { stage, next } atau null kalau tidak
+  // ada tahap yang bermakna (misi jalan biasa). Heist = 2 tahap, balapan = 4
+  // gerbang, taksi = jemput + antar.
+  stageInfo() {
+    const m = this.current();
+    if (!m || this.state !== 'active') return null;
+    if (m.type === 'heist') {
+      return this.heistGrabbed
+        ? { stage: 'STAGE 2/2', next: 'NEXT: Kabur ke dermaga' }
+        : { stage: 'STAGE 1/2', next: 'NEXT: Ambil rampasan di Bank Vela' };
+    }
+    if (m.type === 'race') {
+      return { stage: `STAGE ${this.gateIndex + 1}/4`, next: `NEXT: Gerbang ${this.gateIndex + 1}/4` };
+    }
+    if (m.type === 'taxi' && this.taxi) {
+      return this.taxi.stage === 'pickup'
+        ? { stage: 'STAGE 1/2', next: 'NEXT: Jemput penumpang' }
+        : { stage: 'STAGE 2/2', next: 'NEXT: Antar ke Faro Vela' };
+    }
+    return null;
+  }
+
   start() {
     const m = this.current();
     if (!m) return;

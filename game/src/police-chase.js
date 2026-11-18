@@ -86,6 +86,28 @@ export class PoliceChase {
   policeCount() { return policeCarCount(this.wanted); }
   footCount() { return policeFootCount(this.wanted); }
 
+  // Daftar unit untuk panel HUD "POLISI VELAMAR": nama + jarak (m) + taktik.
+  // Helikopter dulu (SEARCHLIGHT), lalu patroli terdekat: RAMMING / BOXING IN / PURSUIT.
+  units(playerPos) {
+    const list = [];
+    if (this.heli) {
+      const d = Math.hypot(this.heli.mesh.position.x - playerPos.x, this.heli.mesh.position.z - playerPos.z);
+      list.push({ name: 'FARO-1', dist: Math.round(d), tactic: 'SEARCHLIGHT', heli: true });
+    }
+    const tactics = ['RAMMING', 'BOXING IN', 'PURSUIT'];
+    const names = ['VELA-11', 'AZUL-25', 'MARLIN-18'];
+    const sorted = [...this.cars].sort((a, b) => {
+      const da = Math.hypot(a.pos.x - playerPos.x, a.pos.z - playerPos.z);
+      const db = Math.hypot(b.pos.x - playerPos.x, b.pos.z - playerPos.z);
+      return da - db;
+    });
+    sorted.forEach((c, i) => {
+      const d = Math.hypot(c.pos.x - playerPos.x, c.pos.z - playerPos.z);
+      list.push({ name: names[i % names.length], dist: Math.round(d), tactic: tactics[i] || 'PURSUIT' });
+    });
+    return list;
+  }
+
   ensureUnits(playerPos) {
     const want = policeCarCount(this.wanted);
     while (this.cars.length < want) {

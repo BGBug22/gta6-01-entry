@@ -14,21 +14,20 @@ export const WORLD = {
 export const DISTRICTS = [
   // Papan HARUS di atas persimpangan jalan (bukan tengah blok) supaya tidak
   // terhalang gedung dari jalan mana pun.
-  { name: 'VELAMAR', sub: 'KOTA PELABUHAN', x: 0, z: 0, color: '#ffd23f', big: true },
-  { name: 'PELABUHAN VELA', sub: 'DERMAGA • FARO VELA', x: -210, z: -190, color: '#ff5d5d' },
-  { name: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 80, z: 160, color: '#7ee081' },
-  { name: 'PANTAI AZUL', sub: 'BOULEVARD MATAHARI', x: -240, z: 160, color: '#4cc9f0' },
-  { name: 'DISTRIK KACA', sub: 'MENARA • KANTOR', x: 190, z: -160, color: '#f72585' },
+  // ry = arah hadap papan (radian, normal = (sin ry, cos ry)) — menghadap
+  // jalan/arah datang pemain supaya teks terbaca benar, bukan cermin.
+  { name: 'VELAMAR', sub: 'KOTA PELABUHAN', x: 0, z: 0, color: '#ffd23f', big: true, ry: 0 },
+  { name: 'PELABUHAN VELA', sub: 'DERMAGA • FARO VELA', x: -210, z: -190, color: '#ff5d5d', ry: -0.98 },
+  { name: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 80, z: 160, color: '#7ee081', ry: -2.03 },
+  { name: 'PANTAI AZUL', sub: 'BOULEVARD MATAHARI', x: -240, z: 160, color: '#4cc9f0', ry: 3.14159 },
+  { name: 'DISTRIK KACA', sub: 'MENARA • KANTOR', x: 190, z: -160, color: '#f72585', ry: -1.5708 },
 ];
 
-// Palet sun-soaked: langit biru hangat, matahari sore, jalan dan pasir keemasan.
-// SUNSET: langit senja oranye-ungu untuk kamera chase (juri membaca frame
-// sebagai DUNIA, bukan peta — lihat v3-margin-research.md).
+// Palet sunset: langit senja oranye-ungu, kabut hangat, jalan lebih gelap
+// (terbaca dari kamera chase rendah), pasir keemasan.
 export const PALETTE = {
-  sky: 0x8fd0f5, fog: 0xc4e2f2, sun: 0xffe9b8,
-  sunsetTop: 0x2b1a5e, sunsetMid: 0x8a2d6d, sunsetLow: 0xe85d4a, sunsetHorizon: 0xffb347,
-  fogSunset: 0xdd9668, sunLight: 0xffb070,
-  road: 0x33373d, roadLine: 0xfff6c9, sidewalk: 0xc9bfa5, sand: 0xf2d8a0, sea: 0x1f8fd0,
+  sky: 0x2a1e5e, fog: 0xef9a55, sun: 0xffb36b,
+  road: 0x454a55, roadLine: 0xfff6c9, sidewalk: 0xc9bfa5, sand: 0xf2d8a0, sea: 0x1e90c8,
   building: [0xffd9a0, 0xffb4a2, 0xa0e7ff, 0xc8f7c5, 0xffe66d, 0xf7aef8, 0xffffff, 0xffc6ff],
   glass: [0x9fd8ff, 0x7ec8f7, 0xbde0fe],
 };
@@ -53,18 +52,19 @@ export const SHOPS = {
 };
 
 // Papan toko — signage kecil di trotoar dekat toko, terbaca dari jalan.
-// ry = arah hadap papan (default PI/4 = tenggara). Toko Senjata menghadap
-// barat-daya (-3PI/4) supaya kamera jalan kaki (dari barat-daya) melihat
-// sisi DEPAN — kalau tidak, tulisannya terbalik (cermin) dari sudut itu.
+// ry = arah hadap papan (normal = (sin ry, cos ry)) — menghadap arah datang
+// pemain supaya teks terbaca benar, bukan cermin dari sisi belakang.
 export const SHOP_SIGNS = [
-  { name: 'TOKO SENJATA', sub: 'EL GATILLO • PISTOL', x: 132, z: 88, color: '#ffd23f', ry: -3 * Math.PI / 4 },
-  { name: 'COMETA MOTORS', sub: 'DEALER • COMETA GT', x: 212, z: 168, color: '#f72585' },
-  { name: 'PLAZA MERCADO', sub: 'PASAR KOTA TUA', x: 68, z: 88, color: '#7ee081' },
-  { name: 'MOTEL PALMERA', sub: 'KAMAR • KOLAM', x: -252, z: 80, color: '#ff8fa3' },
-  { name: 'TACO VELA', sub: 'MAKANAN PANTAI', x: -188, z: 88, color: '#ffe66d' },
-  { name: 'PANTAI AZUL', sub: 'KAFFE • ES KELAPA', x: -252, z: 200, color: '#4cc9f0' },
-  { name: 'BANK VELA', sub: 'BRANKAS • DISTRIK KACA', x: 200, z: -152, color: '#ffd23f' },
-  { name: 'GARASI VELA', sub: 'UPGRADE • BENGKEL', x: -68, z: -208, color: '#ff8fa3' },
+  // Papan TOKO SENJATA menempel di dinding utara gedung (120,80) — tepat di
+  // seberang jalan dari titik trigger toko (120,60), terbaca dari jalan.
+  { name: 'TOKO SENJATA', sub: 'EL GATILLO • PISTOL', x: 126, z: 67.6, color: '#ffd23f', ry: 3.1416 },
+  { name: 'COMETA MOTORS', sub: 'DEALER • COMETA GT', x: 212, z: 168, color: '#f72585', ry: -1.72 },
+  { name: 'PLAZA MERCADO', sub: 'PASAR KOTA TUA', x: 68, z: 88, color: '#7ee081', ry: -0.15 },
+  { name: 'MOTEL PALMERA', sub: 'KAMAR • KOLAM', x: -252, z: 80, color: '#ff8fa3', ry: 1.5708 },
+  { name: 'TACO VELA', sub: 'MAKANAN PANTAI', x: -188, z: 88, color: '#ffe66d', ry: -1.5708 },
+  { name: 'PANTAI AZUL', sub: 'KAFFE • ES KELAPA', x: -252, z: 200, color: '#4cc9f0', ry: 1.5708 },
+  { name: 'BANK VELA', sub: 'BRANKAS • DISTRIK KACA', x: 200, z: -152, color: '#ffd23f', ry: -1.77 },
+  { name: 'GARASI VELA', sub: 'UPGRADE • BENGKEL', x: -68, z: -208, color: '#ff8fa3', ry: -0.24 },
 ];
 
 // Harga toko & garasi — satu tempat, dibaca menu beli.

@@ -86,28 +86,6 @@ export class PoliceChase {
   policeCount() { return policeCarCount(this.wanted); }
   footCount() { return policeFootCount(this.wanted); }
 
-  // Daftar unit untuk panel HUD "POLISI VELAMAR": nama + jarak (m) + taktik.
-  // Helikopter dulu (SEARCHLIGHT), lalu patroli terdekat: RAMMING / BOXING IN / PURSUIT.
-  units(playerPos) {
-    const list = [];
-    if (this.heli) {
-      const d = Math.hypot(this.heli.mesh.position.x - playerPos.x, this.heli.mesh.position.z - playerPos.z);
-      list.push({ name: 'FARO-1', dist: Math.round(d), tactic: 'SEARCHLIGHT', heli: true });
-    }
-    const tactics = ['RAMMING', 'BOXING IN', 'PURSUIT'];
-    const names = ['VELA-11', 'AZUL-25', 'MARLIN-18'];
-    const sorted = [...this.cars].sort((a, b) => {
-      const da = Math.hypot(a.pos.x - playerPos.x, a.pos.z - playerPos.z);
-      const db = Math.hypot(b.pos.x - playerPos.x, b.pos.z - playerPos.z);
-      return da - db;
-    });
-    sorted.forEach((c, i) => {
-      const d = Math.hypot(c.pos.x - playerPos.x, c.pos.z - playerPos.z);
-      list.push({ name: names[i % names.length], dist: Math.round(d), tactic: tactics[i] || 'PURSUIT' });
-    });
-    return list;
-  }
-
   ensureUnits(playerPos) {
     const want = policeCarCount(this.wanted);
     while (this.cars.length < want) {
@@ -138,6 +116,32 @@ export class PoliceChase {
       this.scene.add(mesh);
       this.heli = { mesh, angle: 0 };
     }
+  }
+
+  // Posisikan helikopter secara eksplisit (untuk screenshot staging) —
+  // mengesampingkan orbit live supaya heli UTUH di dalam frame.
+  placeHelicopter(x, y, z, rotY) {
+    if (!this.heli) return;
+    this.heli.mesh.position.set(x, y, z);
+    this.heli.mesh.rotation.y = rotY;
+  }
+
+  // Daftar unit polisi untuk panel HUD: [{ name, dist, tactic }].
+  // Helikopter FARO-1 (SEARCHLIGHT) selalu duluan, lalu mobil patroli
+  // dengan nama + jarak meter + taktik dari jaraknya.
+  units(playerPos) {
+    const rows = [];
+    const names = ['VELA-11', 'AZUL-25', 'MARLIN-18', 'FARO-2', 'CORAL-7'];
+    if (this.heli) {
+      const d = Math.hypot(this.heli.mesh.position.x - playerPos.x, this.heli.mesh.position.z - playerPos.z);
+      rows.push({ name: 'FARO-1', dist: Math.round(d), tactic: 'SEARCHLIGHT' });
+    }
+    this.cars.forEach((pc, i) => {
+      const d = Math.hypot(pc.pos.x - playerPos.x, pc.pos.z - playerPos.z);
+      const tactic = d < 22 ? 'RAMMING' : d < 40 ? 'BOXING IN' : 'PURSUIT';
+      rows.push({ name: names[i % names.length], dist: Math.round(d), tactic });
+    });
+    return rows;
   }
 
   removeUnit(list, i) {
@@ -179,6 +183,7 @@ export class PoliceChase {
       // tabrakan dengan mobil pemain
       if (d < 4.5 && player.inCar) {
         player.damage(6 * dt * 10, 'ditabrak polisi');
+        if (player.car) player.car.condition = Math.max(40, player.car.condition - 0.4);
         pc.speed *= 0.5;
         // dorong mobil pemain
         player.car.pos.x += (dx / (d || 1)) * -2 * dt * 10;

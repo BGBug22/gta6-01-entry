@@ -53,26 +53,32 @@ export class MissionSystem {
 
   current() { return MISSIONS[this.index] || null; }
 
-  // Info tahap misi untuk kartu HUD: { stage, next } atau null kalau tidak
-  // ada tahap yang bermakna (misi jalan biasa). Heist = 2 tahap, balapan = 4
-  // gerbang, taksi = jemput + antar.
+  // Info progres misi untuk kartu HUD: { stage, total, next }.
+  // Heist = 2 tahap (ambil rampasan → kabur), balapan = 4 gerbang,
+  // sisanya 1 tahap dengan langkah berikutnya dari teks misi.
   stageInfo() {
     const m = this.current();
-    if (!m || this.state !== 'active') return null;
+    if (!m) return { stage: 0, total: 8, next: 'Semua misi selesai!' };
     if (m.type === 'heist') {
       return this.heistGrabbed
-        ? { stage: 'STAGE 2/2', next: 'NEXT: Kabur ke dermaga' }
-        : { stage: 'STAGE 1/2', next: 'NEXT: Ambil rampasan di Bank Vela' };
+        ? { stage: 2, total: 2, next: 'Kabur ke dermaga' }
+        : { stage: 1, total: 2, next: 'Ambil uang rampasan' };
     }
     if (m.type === 'race') {
-      return { stage: `STAGE ${this.gateIndex + 1}/4`, next: `NEXT: Gerbang ${this.gateIndex + 1}/4` };
+      return { stage: Math.min(this.gateIndex + 1, 4), total: 4, next: `Gerbang ${Math.min(this.gateIndex + 1, 4)}/4` };
     }
-    if (m.type === 'taxi' && this.taxi) {
-      return this.taxi.stage === 'pickup'
-        ? { stage: 'STAGE 1/2', next: 'NEXT: Jemput penumpang' }
-        : { stage: 'STAGE 2/2', next: 'NEXT: Antar ke Faro Vela' };
+    if (m.type === 'taxi') {
+      return this.taxi && this.taxi.stage === 'drop'
+        ? { stage: 2, total: 2, next: 'Antar ke Faro Vela' }
+        : { stage: 1, total: 2, next: 'Jemput penumpang' };
     }
-    return null;
+    if (m.type === 'steal') {
+      return { stage: 1, total: 2, next: 'Bawa ke Garasi Vela' };
+    }
+    if (m.type === 'escape') {
+      return { stage: 1, total: 2, next: 'Hilangkan jejakmu' };
+    }
+    return { stage: 1, total: 1, next: m.text };
   }
 
   start() {

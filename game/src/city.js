@@ -137,89 +137,6 @@ function crosswalkTexture(horizontal) {
   return t;
 }
 
-// Kubah langit senja — gradien vertikal deterministik (canvas): ungu gelap di
-// atas, magenta, oranye, emas di horizon. Kubah besar (BackSide) mengelilingi
-// kota supaya kamera chase melihat LANGIT, bukan warna datar.
-function skyDomeTexture() {
-  const c = document.createElement('canvas');
-  c.width = 16; c.height = 512;
-  const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, 512);
-  // Horizon (v=0.5, y=256) harus EMAS-ORANYE: kamera chase melihat langit
-  // di atas horizon, jadi oranye mulai TINGGI (bukan cuma di garis horizon).
-  grad.addColorStop(0.00, '#2b1a5e'); // ungu gelap — zenit
-  grad.addColorStop(0.14, '#7a2d6d'); // magenta
-  grad.addColorStop(0.28, '#e85d4a'); // merah-oranye
-  grad.addColorStop(0.42, '#ff8a3d'); // oranye senja
-  grad.addColorStop(0.52, '#ffb347'); // emas horizon
-  grad.addColorStop(0.70, '#ffd23f');
-  grad.addColorStop(1.00, '#ffd23f');
-  g.fillStyle = grad; g.fillRect(0, 0, 16, 512);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Cakram matahari — radial glow putih-kuning ke oranye transparan.
-function sunTexture() {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
-  const g = c.getContext('2d');
-  const grad = g.createRadialGradient(128, 128, 8, 128, 128, 128);
-  grad.addColorStop(0.00, 'rgba(255,255,240,1)');
-  grad.addColorStop(0.18, 'rgba(255,214,120,1)');
-  grad.addColorStop(0.45, 'rgba(255,150,60,0.55)');
-  grad.addColorStop(1.00, 'rgba(255,120,40,0)');
-  g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Bianglala pantai — roda + jeruji + kabin warna-warni + kaki penyangga.
-// Statis (tanpa animasi) supaya screenshot deterministik.
-function buildFerrisWheel(x, z) {
-  const g = new THREE.Group();
-  const frame = new THREE.MeshLambertMaterial({ color: 0xf4f4f4 });
-  const legMat = new THREE.MeshLambertMaterial({ color: 0x8a6b3d });
-  for (const s of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 26, 1.2), legMat);
-    leg.position.set(s * 7, 13, 0); leg.rotation.z = s * 0.28;
-    g.add(leg);
-  }
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 3, 10), frame);
-  hub.rotation.x = Math.PI / 2; hub.position.y = 24; g.add(hub);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(17, 0.7, 8, 40), frame);
-  rim.position.y = 24; g.add(rim);
-  const cabinColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585, 0xffe66d, 0x4361ee];
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const sx = Math.cos(a) * 17, sy = 24 + Math.sin(a) * 17;
-    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.5, 17, 0.5), frame);
-    spoke.position.set(Math.cos(a) * 8.5, 24 + Math.sin(a) * 8.5, 0);
-    spoke.rotation.z = a + Math.PI / 2;
-    g.add(spoke);
-    const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6, 2.2, 2.2),
-      new THREE.MeshLambertMaterial({ color: cabinColors[i] }),
-    );
-    cabin.position.set(sx, sy, 0);
-    g.add(cabin);
-  }
-  g.position.set(x, 0, z);
-  return g;
-}
-
-// Kapal kecil di laut — lambung putih + kabin biru, statis.
-function buildBoat(x, z, s = 1) {
-  const g = new THREE.Group();
-  const hull = box(6 * s, 2.4 * s, 16 * s, 0xf4f4f4, 0, 1.2 * s, 0);
-  const cabin = box(4 * s, 2.4 * s, 5 * s, 0x4361ee, 0, 3.4 * s, -2 * s);
-  g.add(hull, cabin);
-  g.position.set(x, 0.4, z);
-  return g;
-}
-
 function box(w, h, d, color, x, y, z, opts = {}) {
   const m = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -236,33 +153,58 @@ export function buildCity(scene) {
   const colliders = []; // {minX,maxX,minZ,maxZ}
   const H = WORLD.halfSize;
 
-  // --- Langit senja, kabut hangat, matahari sore dari barat ---
-  // Kubah gradien (bukan warna datar): kamera chase melihat langit oranye-ungu
-  // dengan matahari rendah di atas laut — seperti kota juara top 1/2/4/5.
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(1150, 24, 16),
-    new THREE.MeshBasicMaterial({ map: skyDomeTexture(), side: THREE.BackSide, fog: false }),
+  // --- Langit senja: kubah gradien (ungu-biru di atas, oranye di horizon) ---
+  // Bukan warna datar — gradien vertikal dari canvas, ditempel di bola besar
+  // (BackSide, tanpa fog) supaya horizon selalu oranye dari sudut mana pun.
+  const skyCanvas = document.createElement('canvas');
+  skyCanvas.width = 4; skyCanvas.height = 512;
+  const sg = skyCanvas.getContext('2d');
+  const grad = sg.createLinearGradient(0, 0, 0, 512);
+  // Gradien dikompres supaya oranye SUDAH muncul di langit yang terlihat
+  // dari kamera chase (pita langit di atas horizon = canvas 0..0.41):
+  // ungu di atas, pink di tengah, oranye-emas di dekat horizon.
+  grad.addColorStop(0.0, '#241a55');
+  grad.addColorStop(0.18, '#5b3a8c');
+  grad.addColorStop(0.30, '#b0528f');
+  grad.addColorStop(0.38, '#ff7a4d');
+  grad.addColorStop(0.48, '#ffb347');
+  grad.addColorStop(0.60, '#ffe0a0');
+  grad.addColorStop(1.0, '#ffe0a0');
+  sg.fillStyle = grad; sg.fillRect(0, 0, 4, 512);
+  const skyTex = new THREE.CanvasTexture(skyCanvas);
+  skyTex.colorSpace = THREE.SRGBColorSpace;
+  const skyDome = new THREE.Mesh(
+    new THREE.SphereGeometry(1200, 24, 16),
+    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false }),
   );
-  sky.position.set(0, 0, 0);
-  scene.add(sky);
-  scene.background = null;
-  const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: sunTexture(), fog: false, depthWrite: false, transparent: true,
-  }));
-  sunSprite.position.set(-480, 60, -800);
-  sunSprite.scale.set(200, 200, 1);
-  scene.add(sunSprite);
-  scene.fog = new THREE.Fog(PALETTE.fogSunset, 250, 900);
-  const sun = new THREE.DirectionalLight(0xffc890, 1.7);
-  sun.position.set(-220, 190, -160);
+  scene.add(skyDome);
+  scene.background = new THREE.Color(PALETTE.sky);
+  // Matahari senja rendah di barat (di atas laut) + lingkaran cahayanya.
+  const sunDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(55, 24),
+    new THREE.MeshBasicMaterial({ color: 0xfff3b0, fog: false }),
+  );
+  sunDisc.position.set(-1000, 130, -150);
+  sunDisc.rotation.y = Math.PI / 2;
+  scene.add(sunDisc);
+  const sunGlow = new THREE.Mesh(
+    new THREE.CircleGeometry(120, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.35, fog: false }),
+  );
+  sunGlow.position.set(-1010, 130, -150);
+  sunGlow.rotation.y = Math.PI / 2;
+  scene.add(sunGlow);
+  // Kabut hangat oranye — kota jauh larut dalam senja.
+  scene.fog = new THREE.Fog(PALETTE.fog, 250, 900);
+  // Matahari sore dari barat (rendah, hangat) + lampu isi dari tenggara
+  // supaya buritan mobil tidak gelap + langit ungu di atas.
+  const sun = new THREE.DirectionalLight(0xffb36b, 2.4);
+  sun.position.set(-400, 140, -60);
   scene.add(sun);
-  // Fill dari tenggara (di belakang kamera chase): menerangi buritan mobil +
-  // jalan supaya tidak gelap — matahari senja datang dari barat saja
-  // membuat sisi yang menghadap kamera nyaris hitam.
-  const fill = new THREE.DirectionalLight(0xfff2e0, 0.5);
-  fill.position.set(120, 140, 320);
+  const fill = new THREE.DirectionalLight(0xffe0b8, 0.7);
+  fill.position.set(300, 160, 300);
   scene.add(fill);
-  scene.add(new THREE.HemisphereLight(0xffb27d, 0x5a4a42, 0.65));
+  scene.add(new THREE.HemisphereLight(0x8a6fb8, 0x7a5a3a, 0.95));
 
   // --- Tanah dasar kota (bertekstur) ---
   const ground = new THREE.Mesh(
@@ -274,11 +216,9 @@ export function buildCity(scene) {
   group.add(ground);
 
   // --- Laut (barat) + pantai pasir ---
-  // Laut TANPA kabut: kabut senja yang hangat membuat laut biru jadi coklat
-  // dan tidak terbaca dari kamera chase — laut harus tetap biru.
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(320, H * 2 + 200),
-    new THREE.MeshLambertMaterial({ color: PALETTE.sea, fog: false }),
+    new THREE.MeshLambertMaterial({ color: PALETTE.sea }),
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(WORLD.seaX - 130, 0.02, 0);
@@ -299,6 +239,8 @@ export function buildCity(scene) {
   for (let i = -4; i <= 4; i++) roads.push(i * WORLD.roadGap);
   for (const r of roads) {
     // jalan horizontal (sepanjang x) dan vertikal (sepanjang z)
+    // Jalan dinaikkan (y 0.10) supaya tidak z-fighting dengan trotoar (0.04)
+    // saat dilihat dari kamera chase yang rendah.
     const hRoad = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 14), roadMat);
     hRoad.rotation.x = -Math.PI / 2; hRoad.position.set(0, 0.10, r); group.add(hRoad);
     const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(14, H * 2), roadMat);
@@ -310,9 +252,9 @@ export function buildCity(scene) {
     // garis putus-putus tengah jalan
     for (let d = -H; d < H; d += 16) {
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.7), lineMat);
-      dash.rotation.x = -Math.PI / 2; dash.position.set(d, 0.12, r); group.add(dash);
+      dash.rotation.x = -Math.PI / 2; dash.position.set(d, 0.11, r); group.add(dash);
       const dash2 = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 6), lineMat);
-      dash2.rotation.x = -Math.PI / 2; dash2.position.set(r, 0.12, d); group.add(dash2);
+      dash2.rotation.x = -Math.PI / 2; dash2.position.set(r, 0.11, d); group.add(dash2);
     }
   }
 
@@ -331,14 +273,14 @@ export function buildCity(scene) {
     for (const a of arms) {
       const m = new THREE.Mesh(a.geo, a.mat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(a.x, 0.13, a.z);
+      m.position.set(a.x, 0.12, a.z);
       group.add(m);
     }
   }
 
-  // --- Decal nama distrik di jalan ---
-  // HANYA horizontal (KOTA TUA, VELAMAR): decal vertikal di jalan pantai
-  // jadi coretan merah raksasa dari kamera chase (dulu untuk kamera atas).
+  // --- Decal nama distrik di jalan (HANYA yang horizontal) ---
+  // Decal vertikal (memanjang di jalan) DIHAPUS: dari kamera chase rendah
+  // dia jadi coretan warna raksasa di tengah jalan.
   const decals = [
     { text: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
     { text: 'VELAMAR', sub: 'KOTA PELABUHAN', x: -40, z: 0, vertical: false, color: '#ffd23f' },
@@ -350,7 +292,7 @@ export function buildCity(scene) {
       new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
     );
     m.rotation.x = -Math.PI / 2;
-    m.position.set(d.x, 0.14, d.z);
+    m.position.set(d.x, 0.13, d.z);
     group.add(m);
   }
 
@@ -473,14 +415,13 @@ export function buildCity(scene) {
     new THREE.MeshLambertMaterial({ color: 0xe63946 }),
   );
   cap.position.y = 41; tower.add(cap);
-  // sorot cahaya mercusuar — ke BARAT di atas laut (bukan ke kota): dari
-  // kamera chase, beam ke timur jadi segitiga putih raksasa di tengah frame.
-  // Apex kerucut di menara, melebar ke barat: rotasi -90° (apex +y -> +x).
+  // sorot cahaya mercusuar (kerucut tembus pandang) — mengarah ke BARAT,
+  // di atas laut (bukan ke timur masuk kota).
   const beam = new THREE.Mesh(
-    new THREE.ConeGeometry(7, 40, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: 0.10, side: THREE.DoubleSide }),
+    new THREE.ConeGeometry(9, 60, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: 0.16, side: THREE.DoubleSide }),
   );
-  beam.rotation.z = -Math.PI / 2; beam.position.set(-20, 36, 0);
+  beam.rotation.z = Math.PI / 2; beam.position.set(-30, 36, 0);
   tower.add(beam);
   tower.position.set(-292, 1, -252);
   group.add(tower);
@@ -493,13 +434,68 @@ export function buildCity(scene) {
   boat.position.set(-310, 0.4, -200);
   group.add(boat);
 
-  // Laut TIDAK kosong: kapal-kapal lain + bianglala pantai di kejauhan —
-  // dari kamera chase, sisi laut terisi aktivitas, bukan bidang biru polos.
-  group.add(buildBoat(-330, -60, 1.1));
-  group.add(buildBoat(-345, 90, 0.9));
-  group.add(buildBoat(-322, 240, 1.2));
-  group.add(buildBoat(-335, -260, 0.8));
-  group.add(buildFerrisWheel(-284, -300));
+  // --- Ferris wheel di ujung utara pantai (landmark kedua, terlihat dari jalan pantai) ---
+  const wheel = new THREE.Group();
+  const wheelWhite = new THREE.MeshLambertMaterial({ color: 0xf4f4f4 });
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(1.4, 32, 1.4), wheelWhite);
+    leg.position.set(s * 7, 15, 0);
+    leg.rotation.z = -s * 0.22;
+    wheel.add(leg);
+  }
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(17, 0.8, 8, 32),
+    new THREE.MeshLambertMaterial({ color: 0xe63946 }),
+  );
+  rim.position.y = 30;
+  wheel.add(rim);
+  for (let k = 0; k < 4; k++) {
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.6, 34, 0.6), wheelWhite);
+    spoke.position.y = 30;
+    spoke.rotation.z = (k * Math.PI) / 4;
+    wheel.add(spoke);
+  }
+  const cabinColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585, 0xffe66d, 0x4361ee];
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    const cab = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 2.6, 2.6),
+      new THREE.MeshLambertMaterial({ color: cabinColors[k] }),
+    );
+    cab.position.set(Math.cos(a) * 17, 30 + Math.sin(a) * 17, 0);
+    wheel.add(cab);
+  }
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.6, 1.6, 2, 10),
+    new THREE.MeshLambertMaterial({ color: 0xffd23f }),
+  );
+  hub.rotation.x = Math.PI / 2;
+  hub.position.y = 30;
+  wheel.add(hub);
+  // Roda menghadap timur (ke jalan pantai) supaya bundar penuh dari kamera chase.
+  wheel.rotation.y = Math.PI / 2;
+  wheel.position.set(-284, 0, -300);
+  group.add(wheel);
+
+  // --- 4 kapal di laut (laut tidak boleh kosong dari kamera chase) ---
+  const shipSpots = [
+    { x: -360, z: -260, c: 0xe63946 }, { x: -385, z: -60, c: 0x4cc9f0 },
+    { x: -350, z: 120, c: 0xffd23f }, { x: -395, z: 240, c: 0x7ee081 },
+  ];
+  for (const s of shipSpots) {
+    const ship = new THREE.Group();
+    ship.add(box(5, 2, 13, 0xf4f4f4, 0, 1, 0));
+    ship.add(box(3.4, 2, 4, s.c, 0, 3, -1.5));
+    const mast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 5, 6),
+      new THREE.MeshLambertMaterial({ color: 0x8a6b3d }),
+    );
+    mast.position.set(0, 4.5, 1);
+    ship.add(mast);
+    ship.position.set(s.x, 0.3, s.z);
+    ship.rotation.y = 0.4;
+    group.add(ship);
+  }
 
   // --- Papan nama distrik (signage besar, terbaca dari jauh) ---
   for (const d of DISTRICTS) {
@@ -509,7 +505,7 @@ export function buildCity(scene) {
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
     );
     sign.position.set(d.x, d.big ? 26 : 20, d.z);
-    sign.rotation.y = Math.PI / 4;
+    sign.rotation.y = d.ry !== undefined ? d.ry : Math.PI / 4;
     group.add(sign);
     // tiang penyangga
     const pole = new THREE.Mesh(
@@ -521,20 +517,23 @@ export function buildCity(scene) {
   }
 
   // --- Papan toko (signage kecil di trotoar dekat toko) ---
+  // Ukuran 12×5 di y=4 (setinggi mata) — papan 20×10 di y=12 terlalu tinggi:
+  // dari kamera orang ketiga yang menunduk ke pemain, papan setinggi itu
+  // jatuh DI ATAS tepi frame dan tidak terlihat sama sekali.
   for (const s of SHOP_SIGNS) {
     const tex = textTexture([s.name, s.sub], { color: s.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(20, 10),
+      new THREE.PlaneGeometry(12, 5),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
     );
-    sign.position.set(s.x, 12, s.z);
+    sign.position.set(s.x, 4, s.z);
     sign.rotation.y = s.ry !== undefined ? s.ry : Math.PI / 4;
     group.add(sign);
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.4, 0.4, 7, 8),
+      new THREE.CylinderGeometry(0.4, 0.4, 3, 8),
       new THREE.MeshLambertMaterial({ color: 0x333333 }),
     );
-    pole.position.set(s.x, 3.5, s.z);
+    pole.position.set(s.x, 1.5, s.z);
     group.add(pole);
   }
 

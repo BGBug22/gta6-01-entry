@@ -58,14 +58,12 @@ polisi mengorbit di atasmu.
   Toko Senjata "El Gatillo", beli Cometa GT ($1200) di dealer Cometa Motors,
   upgrade mesin & armour di Garasi Vela. Progres tersimpan otomatis di
   localStorage (lanjutkan dari layar start).
-- **HUD lengkap ala juara**: kartu misi kiri-atas (MISSION x/8 + objektif +
-  STAGE + NEXT + timer), panel respons polisi (unit bernama + jarak meter +
-  taktik: RAMMING / BOXING IN / PURSUIT / SEARCHLIGHT), kartu dialog dengan
-  potret karakter (Mara & Rico), uang + bintang + senjata/amunisi kanan-atas,
-  minimap LINGKARAN kiri-bawah + nama distrik, kecepatan + nama mobil +
-  kondisi + radio kanan-bawah, bar health / armour / respect. Jam kota
-  (DAY 1 18:24, maju saat main), crosshair, prompt tombol, dan layar start /
-  jeda / misi selesai / gagal / tertangkap / tumbang.
+- **HUD lengkap**: health, armour, respect, uang, senjata + amunisi, wanted
+  stars + label (DICARI POLISI / BURONAN / PALING DICARI), objektif + jarak
+  tujuan + timer misi, jam kota (DAY 1 18:24, maju saat main), dialog misi,
+  distrik, radio (SOL FM 95.4), kecepatan + nama mobil saat nyetir, minimap
+  live (pemain, polisi, target misi, mobil), crosshair, prompt tombol, dan
+  layar start / jeda / misi selesai / gagal / tertangkap / tumbang.
 - **Suara sintetis** (WebAudio, tanpa file): mesin, sirene polisi, tembakan,
   koin misi.
 
@@ -98,7 +96,7 @@ di-vendor lokal di `game/vendor/three.module.min.js`, tanpa network request.
 |---|---|
 | `game/src/main.js` | Loop utama, kontrol pemain, kamera, toko, save |
 | `game/src/config.js` | Dunia, distrik, kendaraan, misi, dialog, angka game |
-| `game/src/city.js` | Membangun kota: jalan, gedung, pantai, Faro Vela, langit senja + bianglala |
+| `game/src/city.js` | Membangun kota: jalan, gedung, pantai, Faro Vela |
 | `game/src/vehicles.js` | Pabrik mobil 3D + fisika mengemudi arcade |
 | `game/src/traffic.js` | Mobil lalu lintas AI + pejalan kaki berdetail |
 | `game/src/police-chase.js` | Polisi + wanted level 0–5 + helikopter |
@@ -110,15 +108,13 @@ di-vendor lokal di `game/vendor/three.module.min.js`, tanpa network request.
 | `game/src/input.js` | Keyboard + mouse |
 | `game/src/audio.js` | Suara sintetis WebAudio |
 | `game/src/save.js` | Save/load localStorage (termasuk upgrade garasi) |
-| `game/src/screenshot-staging.js` | Mode screenshot chase street-level deterministik (`?shot=...`) |
+| `game/src/screenshot-staging.js` | Mode screenshot top-down deterministik (`?shot=...`) |
 | `game/src/random.js` | RNG deterministik (seeded) |
 
 ## Screenshot
 
 Empat screenshot deterministik diambil dari game yang benar-benar jalan
-(`shots.json`), semuanya **kamera chase street-level 3D di bawah langit
-senja** (bukan top-down): kejar-kejaran polisi di jalan pantai dengan
-mercusuar Faro Vela + bianglala + helikopter, kabur dari Bank Vela (heist)
-di persimpangan, jalan kaki di depan Toko Senjata dengan menu beli terbuka,
-dan layar misi selesai di atas jalan ramai. Kamera chase yang sama dipakai
-saat bermain — kota terbaca sebagai dunia, bukan peta.
+(`shots.json`), semuanya kamera atas (top-down): kejar-kejaran polisi di
+jalan pantai dengan mercusuar Faro Vela, kabur dari Bank Vela (heist) di
+persimpangan, jalan kaki di depan Toko Senjata dengan menu beli terbuka,
+dan layar misi selesai di atas jalan ramai.

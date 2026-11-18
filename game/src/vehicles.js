@@ -66,6 +66,7 @@ export class Car {
     this.stolen = false; // pernah dicuri pemain (menaikkan wanted sekali)
     this.isPolice = !!opts.police;
     this.isTaxi = !!opts.taxi;
+    this.condition = 100; // kondisi mobil 0–100: turun saat tabrakan / ditabrak polisi
     scene.add(this.mesh);
   }
   get pos() { return this.mesh.position; }

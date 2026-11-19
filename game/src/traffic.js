@@ -1,16 +1,17 @@
-// Lalu lintas + pejalan kaki — mobil AI mengikuti jalan grid, pejalan kaki
-// berjalan di trotoar. Pejalan kaki berdetail: topi, warna kulit bervariasi,
-// tinggi bervariasi, sebagian membawa ransel. Sederhana tapi hidup: berhenti
-// kalau ada mobil di depan, lari ketakutan kalau ada bahaya.
+// Traffic + pedestrians — AI cars follow the road grid, pedestrians walk the
+// sidewalks. Pedestrians are articulated humans now (head, jacket, arms,
+// legs that walk) with varied hats, skin tones, heights, and backpacks.
+// Simple but alive: they stop for a car ahead, and run scared from danger.
 import * as THREE from 'three';
 import { WORLD, CAR_MODELS } from './config.js';
 import { makeRng, pick, range, clamp } from './random.js';
 import { Car } from './vehicles.js';
+import { makeHuman, walkPose } from './human.js';
 
 const ROADS = [];
 for (let i = -4; i <= 4; i++) ROADS.push(i * WORLD.roadGap);
 
-// Satu mobil lalu lintas: jalan lurus di satu jalan, belok di ujung kota.
+// One traffic car: drives straight on one road, turns at the city edge.
 export class TrafficCar {
   constructor(scene, rng) {
     const model = pick(rng, CAR_MODELS.filter((m) => m.id !== 'sport'));
@@ -28,7 +29,7 @@ export class TrafficCar {
     this.wait = 0;
   }
   update(dt, others) {
-    // berhenti kalau ada mobil lain dekat di depan
+    // stop if another car is close ahead
     let blocked = false;
     const fx = Math.sin(this.car.heading), fz = Math.cos(this.car.heading);
     for (const o of others) {
@@ -42,14 +43,14 @@ export class TrafficCar {
     else {
       this.car.speed += (this.cruise - this.car.speed) * Math.min(1, dt * 1.5);
       this.car.drive(0, 0, dt);
-      // belok di ujung: putar balik arah jalan lain (pilih jalan baru)
+      // turn at the edge: reverse onto another road (pick a new road)
       const p = this.car.pos;
       if (Math.abs(p.x) > WORLD.halfSize || Math.abs(p.z) > WORLD.halfSize) {
         this.car.heading += Math.PI;
         this.car.mesh.rotation.y = this.car.heading;
       }
     }
-    // jaga tetap di jalan: koreksi halus ke garis jalan
+    // stay on the road: gentle correction back to the road line
     const road = this.horizontal
       ? Math.round(this.car.pos.z / WORLD.roadGap) * WORLD.roadGap + 3.5 * this.dir
       : Math.round(this.car.pos.x / WORLD.roadGap) * WORLD.roadGap + 3.5 * this.dir;
@@ -58,42 +59,34 @@ export class TrafficCar {
   }
 }
 
-// Pejalan kaki berdetail: topi, warna kulit, tinggi, dan ransel bervariasi.
+// Articulated pedestrian: hat, skin tone, height, and backpack vary.
 const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703];
 const SKIN_TONES = [0xf1c27d, 0x8a5a2b, 0xe8b98a, 0x6b4423, 0xc68642];
 const HAT_COLORS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, 0xf72585];
 export class Pedestrian {
   constructor(scene, rng) {
-    this.mesh = new THREE.Group();
     const color = pick(rng, PED_COLORS);
     const skin = pick(rng, SKIN_TONES);
-    const body = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.45, 1.0, 4, 8),
-      new THREE.MeshLambertMaterial({ color }),
-    );
-    body.position.y = 1.0; this.mesh.add(body);
-    const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.32, 10, 8),
-      new THREE.MeshLambertMaterial({ color: skin }),
-    );
-    head.position.y = 2.05; this.mesh.add(head);
-    // topi (separuh pejalan kaki) — topi jerami / cap warna-warni
-    if (rng() < 0.5) {
-      const hat = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.42, 0.46, 0.16, 10),
+    const hat = rng() < 0.5;
+    const pack = rng() < 0.4;
+    this.mesh = makeHuman({
+      skin,
+      jacket: color,
+      pants: pick(rng, [0x2b3a55, 0x3a3a3a, 0x5a4a3a, 0x2a4a3a]),
+      hair: pick(rng, [0x2b2b3a, 0x6b4423, 0x111111, 0x8a5a2b]),
+      cap: hat,
+      capColor: pick(rng, HAT_COLORS),
+    });
+    // backpack (40% of pedestrians)
+    if (pack) {
+      const bp = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.5, 0.2),
         new THREE.MeshLambertMaterial({ color: pick(rng, HAT_COLORS) }),
       );
-      hat.position.y = 2.32; this.mesh.add(hat);
+      bp.position.set(0, 1.25, -0.26);
+      this.mesh.add(bp);
     }
-    // ransel (40% pejalan kaki)
-    if (rng() < 0.4) {
-      const pack = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.65, 0.28),
-        new THREE.MeshLambertMaterial({ color: pick(rng, HAT_COLORS) }),
-      );
-      pack.position.set(0, 1.15, -0.5); this.mesh.add(pack);
-    }
-    // tinggi bervariasi 0.9 – 1.12
+    // height varies 0.9 – 1.12
     const h = range(rng, 0.9, 1.12);
     this.mesh.scale.set(1, h, 1);
     const x = range(rng, -WORLD.halfSize, WORLD.halfSize);
@@ -103,7 +96,7 @@ export class Pedestrian {
     this.speed = range(rng, 1.2, 2.2);
     this.fleeing = false;
     this.health = 100;
-    this.animT = 0; // jam animasi simulasi (BUKAN performance.now — harus deterministik)
+    this.animT = 0; // simulation clock (NOT performance.now — must stay deterministic)
     scene.add(this.mesh);
   }
   newTarget(rng) {
@@ -112,7 +105,7 @@ export class Pedestrian {
   update(dt, rng, danger) {
     this.animT += dt;
     const p = this.mesh.position;
-    // lari menjauh dari bahaya (tembakan / mobil ngebut dekat)
+    // run away from danger (gunfire / a speeding car nearby)
     let tx = this.target.x, tz = this.target.z;
     if (danger && Math.hypot(danger.x - p.x, danger.z - p.z) < 18) {
       tx = p.x + (p.x - danger.x) * 2; tz = p.z + (p.z - danger.z) * 2;
@@ -124,8 +117,8 @@ export class Pedestrian {
     const sp = this.speed * (this.fleeing ? 2.6 : 1);
     p.x += (dx / d) * sp * dt; p.z += (dz / d) * sp * dt;
     this.mesh.rotation.y = Math.atan2(dx, dz);
-    // animasi jalan: goyang ringan (jam simulasi — deterministik)
-    this.mesh.children[0].position.y = 1.0 + Math.abs(Math.sin(this.animT * 8 + p.x)) * 0.08;
+    // walk cycle: arms and legs swing (simulation clock — deterministic)
+    walkPose(this.mesh, this.animT, this.fleeing ? 1.6 : 1);
   }
 }
 

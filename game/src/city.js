@@ -1,23 +1,23 @@
-// Kota VELAMAR — membangun semua mesh statis: jalan, trotoar, zebra cross,
-// gedung ber-grid jendela menyala + atap genteng hangat, pantai, laut, dermaga,
-// mercusuar Faro Vela, papan nama distrik + decal tanah, payung & menara pantai.
-// Mengembalikan { group, colliders } — colliders = AABB gedung & tembok.
+// City of VELAMAR — builds all static meshes: roads, sidewalks, crosswalks,
+// buildings with lit window grids + warm tile roofs, beach, sea, pier,
+// Faro Vela lighthouse, district signs + ground decals, umbrellas & beach
+// towers. Returns { group, colliders } — colliders = building & wall AABBs.
+// v5: procedural textures (asphalt, Art Deco facades, glass towers, neon
+// signs, containers, sand, sea, sun, clouds), procedural clouds, sun with
+// halo bloom, sea sparkle + foam shoreline, curved palms with 7 layered
+// fronds, neon signs (VELA BANK, HOTEL AZUL, EL GATILLO ARMS), a dock
+// container yard + crane + cargo ship, streetlights, and a night mode
+// (buildCity(scene, { night: true })) for the heist shot.
 import * as THREE from 'three';
 import { WORLD, DISTRICTS, PALETTE, ROOF_COLORS, SHOP_SIGNS } from './config.js';
 import { makeRng, pick, range } from './random.js';
+import {
+  lcg, asphaltTexture, artDecoFacade, glassTowerTexture, neonSignTexture,
+  containerTexture, sandTexture, seaTexture, sunTexture, cloudTexture,
+  groundTexture,
+} from './textures.js';
 
-// LCG kecil untuk tekstur deterministik (bukan Math.random).
-function lcg(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// Tekstur papan nama (canvas) — untuk signage vertikal.
+// Sign texture (canvas) — for vertical signage.
 function textTexture(lines, opts = {}) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -38,8 +38,8 @@ function textTexture(lines, opts = {}) {
   return t;
 }
 
-// Decal tanah — teks dicat di jalan, terbaca dari kamera atas.
-// vertical = teks memanjang sepanjang sumbu z (jalan vertikal).
+// Ground decal — text painted on the road, readable from a high camera.
+// vertical = text running along the z axis (vertical road).
 function groundDecalTexture(text, sub, color, vertical) {
   const c = document.createElement('canvas');
   c.width = vertical ? 128 : 512;
@@ -80,48 +80,7 @@ function groundDecalTexture(text, sub, color, vertical) {
   return t;
 }
 
-// Tekstur tanah — hijau hangat berbintik (bukan datar polos).
-function groundTexture() {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#a8b078'; g.fillRect(0, 0, 256, 256);
-  const r = lcg(7);
-  const dots = ['#98a868', '#b8c088', '#c9b183', '#8a9a68', '#b0a06a'];
-  for (let i = 0; i < 900; i++) {
-    g.fillStyle = dots[Math.floor(r() * dots.length)];
-    const s = 2 + r() * 5;
-    g.fillRect(r() * 256, r() * 256, s, s);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(28, 28);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Fasad gedung — dinding hangat + grid jendela (sebagian menyala kuning).
-function facadeTexture(wall, lit, seed) {
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = wall; g.fillRect(0, 0, 128, 256);
-  const r = lcg(seed);
-  // lantai dasar lebih gelap
-  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 216, 128, 40);
-  for (let row = 0; row < 9; row++) {
-    for (let col = 0; col < 5; col++) {
-      const x = 10 + col * 22, y = 12 + row * 22;
-      g.fillStyle = r() < lit ? (r() < 0.5 ? '#ffd23f' : '#fff2c9') : '#2b3a55';
-      g.fillRect(x, y, 14, 16);
-    }
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// Zebra cross — garis putih memanjang searah jalan.
+// Crosswalk — white stripes running along the road.
 function crosswalkTexture(horizontal) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = 64;
@@ -147,29 +106,37 @@ function box(w, h, d, color, x, y, z, opts = {}) {
   return m;
 }
 
-export function buildCity(scene) {
+export function buildCity(scene, opts = {}) {
+  const night = !!opts.night;
   const rng = makeRng(WORLD.seed);
   const group = new THREE.Group();
   const colliders = []; // {minX,maxX,minZ,maxZ}
   const H = WORLD.halfSize;
 
-  // --- Langit senja: kubah gradien (ungu-biru di atas, oranye di horizon) ---
-  // Bukan warna datar — gradien vertikal dari canvas, ditempel di bola besar
-  // (BackSide, tanpa fog) supaya horizon selalu oranye dari sudut mana pun.
+  // --- Sunset sky dome: vertical gradient canvas on a big sphere ---
+  // (BackSide, no fog) so the horizon stays orange from any angle.
   const skyCanvas = document.createElement('canvas');
   skyCanvas.width = 4; skyCanvas.height = 512;
   const sg = skyCanvas.getContext('2d');
   const grad = sg.createLinearGradient(0, 0, 0, 512);
-  // Gradien dikompres supaya oranye SUDAH muncul di langit yang terlihat
-  // dari kamera chase (pita langit di atas horizon = canvas 0..0.41):
-  // ungu DALAM di atas, pink di tengah, oranye-emas di dekat horizon.
-  grad.addColorStop(0.0, '#1c1248');
-  grad.addColorStop(0.12, '#4a2f7e');
-  grad.addColorStop(0.22, '#a04a8a');
-  grad.addColorStop(0.32, '#ff6a4d');
-  grad.addColorStop(0.40, '#ffb347');
-  grad.addColorStop(0.50, '#ffe0a0');
-  grad.addColorStop(1.0, '#ffe0a0');
+  if (night) {
+    // night: deep blue top, purple mid, dark ember at the horizon
+    grad.addColorStop(0.0, '#050518');
+    grad.addColorStop(0.20, '#141038');
+    grad.addColorStop(0.34, '#3a2050');
+    grad.addColorStop(0.44, '#7a3a3a');
+    grad.addColorStop(0.55, '#c06a3a');
+    grad.addColorStop(1.0, '#c06a3a');
+  } else {
+    // golden hour: deep purple top, pink mid, coral/gold at the horizon
+    grad.addColorStop(0.0, '#1c1248');
+    grad.addColorStop(0.12, '#4a2f7e');
+    grad.addColorStop(0.22, '#a04a8a');
+    grad.addColorStop(0.32, '#ff6a4d');
+    grad.addColorStop(0.40, '#ffb347');
+    grad.addColorStop(0.50, '#ffe0a0');
+    grad.addColorStop(1.0, '#ffe0a0');
+  }
   sg.fillStyle = grad; sg.fillRect(0, 0, 4, 512);
   const skyTex = new THREE.CanvasTexture(skyCanvas);
   skyTex.colorSpace = THREE.SRGBColorSpace;
@@ -178,37 +145,93 @@ export function buildCity(scene) {
     new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false }),
   );
   scene.add(skyDome);
-  scene.background = new THREE.Color(PALETTE.sky);
-  // Matahari senja rendah di barat-laut (di atas laut) + lingkaran cahayanya.
-  // Posisinya di utara-barat supaya masuk frame kamera chase pantai
-  // (yaw ~0.95, memandang barat-laut): cakram terlihat di langit kiri-atas.
-  const sunDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(55, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffe066, fog: false }),
-  );
-  sunDisc.position.set(-1000, 120, -350);
-  sunDisc.rotation.y = Math.PI / 2;
-  scene.add(sunDisc);
-  const sunGlow = new THREE.Mesh(
-    new THREE.CircleGeometry(120, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.35, fog: false }),
-  );
-  sunGlow.position.set(-1010, 120, -350);
-  sunGlow.rotation.y = Math.PI / 2;
-  scene.add(sunGlow);
-  // Kabut hangat oranye — kota jauh larut dalam senja.
-  scene.fog = new THREE.Fog(PALETTE.fog, 250, 900);
-  // Matahari sore dari barat (rendah, hangat) + lampu isi dari tenggara
-  // supaya buritan mobil tidak gelap + langit ungu di atas.
-  const sun = new THREE.DirectionalLight(0xffb36b, 2.4);
+  scene.background = new THREE.Color(night ? 0x0a0a24 : PALETTE.sky);
+
+  // --- Procedural clouds: soft billboards high in the sky ---
+  // Static positions (seeded) so screenshots stay deterministic.
+  const cloudTex = cloudTexture();
+  const cloudMat = new THREE.MeshBasicMaterial({
+    map: cloudTex, transparent: true, opacity: night ? 0.35 : 0.85,
+    side: THREE.DoubleSide, depthWrite: false, fog: false,
+  });
+  const cloudRng = makeRng(WORLD.seed + 101);
+  for (let i = 0; i < 12; i++) {
+    const w = 120 + cloudRng() * 180;
+    const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.42), cloudMat);
+    cloud.position.set(
+      -500 + cloudRng() * 1000,
+      180 + cloudRng() * 160,
+      -600 + cloudRng() * 900,
+    );
+    cloud.rotation.y = Math.PI / 2 + (cloudRng() - 0.5) * 0.6;
+    scene.add(cloud);
+  }
+
+  // --- Sun (golden hour): disc + halo bloom + reflection shimmer on the sea ---
+  // Positioned low over the sea (north-west) so it enters the cover frame
+  // from the beach chase camera (yaw ~0.95, looking north-west).
+  if (!night) {
+    const haloTex = sunTexture();
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(420, 420),
+      new THREE.MeshBasicMaterial({
+        map: haloTex, transparent: true, opacity: 0.9,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+      }),
+    );
+    halo.position.set(-1000, 120, -350);
+    halo.rotation.y = Math.PI / 2;
+    scene.add(halo);
+    const sunDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(55, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffe066, fog: false }),
+    );
+    sunDisc.position.set(-990, 120, -350);
+    sunDisc.rotation.y = Math.PI / 2;
+    scene.add(sunDisc);
+    // sun reflection: a warm shimmer strip on the sea below the sun
+    const reflect = new THREE.Mesh(
+      new THREE.PlaneGeometry(90, 260),
+      new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.22, depthWrite: false }),
+    );
+    reflect.rotation.x = -Math.PI / 2;
+    reflect.position.set(-380, 0.06, -320);
+    group.add(reflect);
+  } else {
+    // stars: small white points on the night dome (seeded, deterministic)
+    const starRng = makeRng(WORLD.seed + 202);
+    const starPos = [];
+    for (let i = 0; i < 220; i++) {
+      const a = starRng() * Math.PI * 2;
+      const e = 0.25 + starRng() * 1.1;
+      const r = 1150;
+      starPos.push(Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, Math.sin(a) * Math.cos(e) * r);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 3, sizeAttenuation: false, fog: false }));
+    scene.add(stars);
+    // moon: a pale disc high in the east
+    const moon = new THREE.Mesh(
+      new THREE.CircleGeometry(38, 24),
+      new THREE.MeshBasicMaterial({ color: 0xe8ecff, fog: false }),
+    );
+    moon.position.set(900, 420, -500);
+    moon.rotation.y = -Math.PI / 2;
+    scene.add(moon);
+  }
+
+  // --- Fog + lights ---
+  scene.fog = new THREE.Fog(night ? 0x1a1a3a : PALETTE.fog, night ? 200 : 250, night ? 800 : 900);
+  const sun = new THREE.DirectionalLight(night ? 0x8a9fd8 : 0xffb36b, night ? 1.0 : 2.4);
   sun.position.set(-400, 140, -60);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xffe0b8, 0.7);
+  const fill = new THREE.DirectionalLight(0xffe0b8, night ? 0.35 : 0.7);
   fill.position.set(300, 160, 300);
   scene.add(fill);
-  scene.add(new THREE.HemisphereLight(0x8a6fb8, 0x7a5a3a, 0.95));
+  scene.add(new THREE.HemisphereLight(night ? 0x2a2a5a : 0x8a6fb8, 0x7a5a3a, night ? 0.55 : 0.95));
 
-  // --- Tanah dasar kota (bertekstur) ---
+  // --- City ground (textured) ---
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(H * 2 + 200, H * 2 + 200),
     new THREE.MeshLambertMaterial({ map: groundTexture() }),
@@ -217,42 +240,55 @@ export function buildCity(scene) {
   ground.position.set(40, -0.05, 0);
   group.add(ground);
 
-  // --- Laut (barat) + pantai pasir (LEBAR — pasir menyentuh tepi jalan
-  // pantai supaya pantai terbaca dari kamera chase, bukan strip jauh) ---
+  // --- Sea (west) with sparkle texture + sand with grain texture ---
+  const seaTex = seaTexture();
+  seaTex.repeat.set(6, 14);
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(320, H * 2 + 200),
-    new THREE.MeshLambertMaterial({ color: PALETTE.sea }),
+    new THREE.MeshLambertMaterial({ map: seaTex }),
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(WORLD.seaX - 130, 0.02, 0);
   group.add(sea);
+  const sandTex = sandTexture();
+  sandTex.repeat.set(1, 14);
   const sand = new THREE.Mesh(
     new THREE.PlaneGeometry(50, H * 2 + 200),
-    new THREE.MeshLambertMaterial({ color: PALETTE.sand }),
+    new THREE.MeshLambertMaterial({ map: sandTex }),
   );
   sand.rotation.x = -Math.PI / 2;
   sand.position.set(WORLD.beachX - 12, 0.03, 0);
   group.add(sand);
+  // foam shoreline: white translucent strip where waves meet the sand
+  const foam = new THREE.Mesh(
+    new THREE.PlaneGeometry(7, H * 2 + 200),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false }),
+  );
+  foam.rotation.x = -Math.PI / 2;
+  foam.position.set(WORLD.beachX - 38, 0.05, 0);
+  group.add(foam);
 
-  // --- Jalan grid + trotoar + garis tengah ---
-  const roadMat = new THREE.MeshLambertMaterial({ color: PALETTE.road });
+  // --- Road grid + sidewalks + center dashes (grainy asphalt texture) ---
+  const roadTexH = asphaltTexture(); roadTexH.repeat.set(40, 1);
+  const roadTexV = asphaltTexture(); roadTexV.repeat.set(1, 40);
+  const roadMatH = new THREE.MeshLambertMaterial({ map: roadTexH });
+  const roadMatV = new THREE.MeshLambertMaterial({ map: roadTexV });
   const walkMat = new THREE.MeshLambertMaterial({ color: PALETTE.sidewalk });
   const lineMat = new THREE.MeshBasicMaterial({ color: PALETTE.roadLine });
   const roads = [];
   for (let i = -4; i <= 4; i++) roads.push(i * WORLD.roadGap);
   for (const r of roads) {
-    // jalan horizontal (sepanjang x) dan vertikal (sepanjang z)
-    // Jalan dinaikkan (y 0.10) supaya tidak z-fighting dengan trotoar (0.04)
-    // saat dilihat dari kamera chase yang rendah.
-    const hRoad = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 14), roadMat);
+    // roads raised (y 0.10) so they don't z-fight the sidewalks (0.04)
+    // when seen from the low chase camera.
+    const hRoad = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 14), roadMatH);
     hRoad.rotation.x = -Math.PI / 2; hRoad.position.set(0, 0.10, r); group.add(hRoad);
-    const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(14, H * 2), roadMat);
+    const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(14, H * 2), roadMatV);
     vRoad.rotation.x = -Math.PI / 2; vRoad.position.set(r, 0.10, 0); group.add(vRoad);
     const hWalk = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 20), walkMat);
     hWalk.rotation.x = -Math.PI / 2; hWalk.position.set(0, 0.04, r); group.add(hWalk);
     const vWalk = new THREE.Mesh(new THREE.PlaneGeometry(20, H * 2), walkMat);
     vWalk.rotation.x = -Math.PI / 2; vWalk.position.set(r, 0.04, 0); group.add(vWalk);
-    // garis putus-putus tengah jalan
+    // dashed center lines
     for (let d = -H; d < H; d += 16) {
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.7), lineMat);
       dash.rotation.x = -Math.PI / 2; dash.position.set(d, 0.11, r); group.add(dash);
@@ -261,7 +297,7 @@ export function buildCity(scene) {
     }
   }
 
-  // --- Zebra cross di SEMUA persimpangan ---
+  // --- Crosswalks at EVERY intersection ---
   const crossV = new THREE.MeshBasicMaterial({ map: crosswalkTexture(false), transparent: true });
   const crossH = new THREE.MeshBasicMaterial({ map: crosswalkTexture(true), transparent: true });
   const crossGeoV = new THREE.PlaneGeometry(14, 9);
@@ -281,12 +317,12 @@ export function buildCity(scene) {
     }
   }
 
-  // --- Decal nama distrik di jalan (HANYA yang horizontal) ---
-  // Decal vertikal (memanjang di jalan) DIHAPUS: dari kamera chase rendah
-  // dia jadi coretan warna raksasa di tengah jalan.
+  // --- District name decals on the road (horizontal only) ---
+  // Vertical decals (running down the road) REMOVED: from the low chase
+  // camera they become giant color smears across the road.
   const decals = [
     { text: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
-    { text: 'VELAMAR', sub: 'KOTA PELABUHAN', x: -40, z: 0, vertical: false, color: '#ffd23f' },
+    { text: 'VELAMAR', sub: 'HARBOR CITY', x: -40, z: 0, vertical: false, color: '#ffd23f' },
   ];
   for (const d of decals) {
     const tex = groundDecalTexture(d.text, d.sub, d.color, d.vertical);
@@ -299,18 +335,20 @@ export function buildCity(scene) {
     group.add(m);
   }
 
-  // --- Gedung per blok (hindari jalan) — fasad ber-grid jendela + atap genteng hangat ---
+  // --- Buildings per block (avoid roads) — Art Deco facades + glass towers
+  // with lit windows + warm tile roofs ---
+  const lit = night ? 0.85 : 0.7;
   const facades = [
-    facadeTexture('#ffd9a0', 0.7, 11),
-    facadeTexture('#ffb4a2', 0.65, 23),
-    facadeTexture('#ffe66d', 0.6, 37),
-    facadeTexture('#9fd8ff', 0.75, 51),
+    artDecoFacade('#ffd9a0', lit, 11),
+    artDecoFacade('#ffb4a2', lit, 23),
+    artDecoFacade('#ffe66d', lit, 37),
+    glassTowerTexture('#9fd8ff', night ? 0.9 : 0.75, 51),
   ];
   const blockCenters = [];
   for (let ix = -3; ix <= 3; ix++) for (let iz = -3; iz <= 3; iz++) {
     const cx = ix * WORLD.roadGap + WORLD.roadGap / 2;
     const cz = iz * WORLD.roadGap + WORLD.roadGap / 2;
-    if (cx < WORLD.beachX + 20) continue; // area pantai/demaga kosong
+    if (cx < WORLD.beachX + 20) continue; // beach / pier area stays open
     blockCenters.push({ cx, cz });
   }
   for (const { cx, cz } of blockCenters) {
@@ -328,7 +366,7 @@ export function buildCity(scene) {
       );
       b.position.set(x, h / 2, z);
       group.add(b);
-      // atap genteng hangat + detail atap (AC / tangki air)
+      // warm tile roof + roof detail (AC / water tank)
       const roofColor = pick(rng, ROOF_COLORS);
       const roof = box(w + 1, 1, d + 1, roofColor, x, h + 0.5, z);
       group.add(roof);
@@ -347,49 +385,93 @@ export function buildCity(scene) {
     }
   }
 
-  // --- Pohon PALEM (bukan pohon bulat) di trotoar + barisan palem pantai ---
-  // Palem = penanda visual "kota pesisir cerah" yang paling konsisten di
-  // top 10: batang ramping + 4 pelepah menjuntai. Geometri dibagi (shared)
-  // supaya 100+ palem tidak membengkak: 5 mesh per palem.
+  // --- Neon signs on building facades (glowing, readable from the road) ---
+  const neons = [
+    { text: 'VELA BANK', sub: 'VAULT • GLASS DISTRICT', x: 190, y: 14, z: -148, color: '#ffd23f', ry: Math.PI },
+    { text: 'HOTEL AZUL', sub: 'ROOMS • SEA VIEW', x: -252, y: 12, z: 168, color: '#4cc9f0', ry: Math.PI / 2 },
+    { text: 'EL GATILLO ARMS', sub: 'GUNS • AMMO', x: 126, y: 10, z: 66, color: '#ff5d5d', ry: Math.PI },
+  ];
+  for (const n of neons) {
+    const tex = neonSignTexture(n.text, n.sub, n.color);
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(16, 8),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }),
+    );
+    sign.position.set(n.x, n.y, n.z);
+    sign.rotation.y = n.ry;
+    group.add(sign);
+  }
+
+  // --- PALM trees (not round trees) on sidewalks + the beach promenade ---
+  // A palm = a curved trunk (2 segments) + 7 layered drooping fronds in
+  // two greens. Geometry is shared so 100+ palms stay cheap: 9 meshes each.
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
   const leafMat = new THREE.MeshLambertMaterial({ color: 0x2fae5f });
-  const palmTrunkGeo = new THREE.CylinderGeometry(0.22, 0.42, 8, 6);
+  const leafMat2 = new THREE.MeshLambertMaterial({ color: 0x45c47a });
+  const palmTrunkGeo = new THREE.CylinderGeometry(0.2, 0.42, 8, 6);
   const palmFrondGeo = new THREE.BoxGeometry(5.2, 0.12, 1.3);
+  const palmFrondGeo2 = new THREE.BoxGeometry(4.2, 0.12, 1.1);
   function makePalm(x, z, h, lean) {
     const g = new THREE.Group();
-    const trunk = new THREE.Mesh(palmTrunkGeo, trunkMat);
-    trunk.scale.y = h / 8;
-    trunk.position.y = h / 2;
-    trunk.rotation.z = lean;
-    g.add(trunk);
-    for (let k = 0; k < 4; k++) {
+    // curved trunk: lower segment straight, upper segment leaning
+    const lower = new THREE.Mesh(palmTrunkGeo, trunkMat);
+    lower.scale.y = (h * 0.6) / 8;
+    lower.position.y = h * 0.3;
+    g.add(lower);
+    const upper = new THREE.Mesh(palmTrunkGeo, trunkMat);
+    upper.scale.y = (h * 0.45) / 8;
+    upper.position.set(lean * h * 0.5, h * 0.75, 0);
+    upper.rotation.z = lean * 2.2;
+    g.add(upper);
+    const topX = lean * h * 0.9;
+    const topY = h;
+    for (let k = 0; k < 7; k++) {
       const holder = new THREE.Group();
-      holder.position.y = h;
-      holder.rotation.y = (k * Math.PI) / 2 + 0.4;
-      const frond = new THREE.Mesh(palmFrondGeo, leafMat);
-      frond.position.set(2.3, -0.7, 0);
-      frond.rotation.z = -0.5; // menjuntai ke bawah
+      holder.position.set(topX, topY, 0);
+      holder.rotation.y = (k * Math.PI * 2) / 7 + 0.3;
+      const frond = new THREE.Mesh(k % 2 ? palmFrondGeo2 : palmFrondGeo, k % 2 ? leafMat2 : leafMat);
+      frond.position.set(2.2, -0.6 - (k % 3) * 0.25, 0);
+      frond.rotation.z = -0.5 - (k % 3) * 0.12; // layered droop
       holder.add(frond);
       g.add(holder);
     }
     g.position.set(x, 0, z);
     return g;
   }
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 70; i++) {
     const rx = roads[Math.floor(rng() * roads.length)] + (rng() < 0.5 ? -11 : 11);
     const rz = range(rng, -H, H);
     if (rx < WORLD.beachX + 8) continue;
     group.add(makePalm(rx, rz, 7 + (i % 3), (i % 5) * 0.02 - 0.04));
   }
-  // Barisan palem di promenade pantai (x=-263, di atas pasir, tiap 20 m) —
-  // pagar hijau jalan pantai yang terlihat di cover. Jitter deterministik
-  // dari lcg lokal (bukan rng kota) supaya urutan acak kota tidak bergeser.
+  // Beach promenade palm row (x=-263, on the sand, every 20 m) — the green
+  // fence of the beach boulevard seen in the cover. Deterministic jitter
+  // from a local lcg (not the city rng) so the city draw order never shifts.
   const pj = lcg(99);
   for (let z = -320; z <= 320; z += 20) {
     group.add(makePalm(-263 + (pj() - 0.5) * 6, z + (pj() - 0.5) * 8, 8, (pj() - 0.5) * 0.08));
   }
 
-  // --- Pantai: 14 payung warna-warni + 3 menara penjaga ---
+  // --- Streetlights along the beach boulevard + main roads ---
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x2b2b2b });
+  const glowMat = new THREE.MeshBasicMaterial({ color: night ? 0xffe9a0 : 0xfff2c9, transparent: true, opacity: night ? 1 : 0.7 });
+  function streetlight(x, z) {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 7, 6), poleMat);
+    pole.position.y = 3.5; g.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 0.14), poleMat);
+    arm.position.set(1, 6.9, 0); g.add(arm);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), glowMat);
+    lamp.position.set(2, 6.7, 0); g.add(lamp);
+    g.position.set(x, 0, z);
+    return g;
+  }
+  for (let z = -300; z <= 300; z += 40) {
+    group.add(streetlight(-252, z));
+    if (z % 80 === 0) group.add(streetlight(12, z));
+  }
+
+  // --- Beach: 14 colorful umbrellas + 3 lifeguard towers ---
   const umbrellaColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585];
   for (let i = 0; i < 14; i++) {
     const z = -300 + i * 46;
@@ -417,11 +499,11 @@ export function buildCity(scene) {
     group.add(tower);
   }
 
-  // --- Dermaga kayu di barat laut + mercusuar FARO VELA (landmark) ---
+  // --- Wooden pier in the north-west + FARO VELA lighthouse (landmark) ---
   const pier = box(16, 1.2, 130, 0x8a6b3d, -292, 0.6, -190);
   group.add(pier);
-  // Dermaga TIDAK masuk colliders: permukaannya datar dan boleh dilalui
-  // (misi terakhir berakhir di ujung dermaga).
+  // The pier is NOT a collider: its surface is flat and walkable
+  // (the final mission ends at the end of the pier).
   const tower = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(7, 9, 34, 16),
@@ -429,8 +511,8 @@ export function buildCity(scene) {
   );
   base.position.y = 17; tower.add(base);
   for (let i = 0; i < 3; i++) {
-    // Pita merah HARUS lebih besar dari radius menara di ketinggian itu
-    // (menara meruncing 9 -> 7): kalau tidak, pitanya tenggelam di dalam.
+    // Red bands MUST be wider than the tower radius at that height
+    // (the tower tapers 9 -> 7): otherwise the band sinks inside.
     const band = new THREE.Mesh(
       new THREE.CylinderGeometry(8.6 - i * 0.35, 8.6 - i * 0.35, 4, 16),
       new THREE.MeshLambertMaterial({ color: 0xe63946 }),
@@ -447,18 +529,18 @@ export function buildCity(scene) {
     new THREE.MeshLambertMaterial({ color: 0xe63946 }),
   );
   cap.position.y = 41; tower.add(cap);
-  // sorot cahaya mercusuar (kerucut tembus pandang) — mengarah ke BARAT,
-  // di atas laut (bukan ke timur masuk kota).
+  // lighthouse beam (translucent cone) — points WEST, over the sea
+  // (not east into the city).
   const beam = new THREE.Mesh(
     new THREE.ConeGeometry(9, 60, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: 0.16, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: night ? 0.3 : 0.16, side: THREE.DoubleSide }),
   );
   beam.rotation.z = Math.PI / 2; beam.position.set(-30, 36, 0);
   tower.add(beam);
   tower.position.set(-292, 1, -252);
   group.add(tower);
 
-  // kapal kecil di dermaga (tujuan misi terakhir)
+  // small boat at the pier (final mission destination)
   const boat = new THREE.Group();
   const hull = box(6, 2.4, 16, 0xf4f4f4, 0, 1.2, 0);
   const cabin = box(4, 2.4, 5, 0x4361ee, 0, 3.4, -2);
@@ -466,7 +548,55 @@ export function buildCity(scene) {
   boat.position.set(-310, 0.4, -200);
   group.add(boat);
 
-  // --- Ferris wheel di ujung utara pantai (landmark kedua, terlihat dari jalan pantai) ---
+  // --- Puerto Vela Docks: container yard + crane + cargo ship ---
+  const dockX = -252, dockZ = -140;
+  const contTex = containerTexture();
+  const contMat = new THREE.MeshLambertMaterial({ map: contTex });
+  const contGeo = new THREE.BoxGeometry(12, 2.6, 2.6);
+  const contSpots = [
+    { x: -246, z: -120, y: 1.3, ry: 0 }, { x: -246, z: -120, y: 3.9, ry: 0 },
+    { x: -246, z: -132, y: 1.3, ry: 0 }, { x: -258, z: -108, y: 1.3, ry: Math.PI / 2 },
+    { x: -258, z: -108, y: 3.9, ry: Math.PI / 2 }, { x: -258, z: -108, y: 6.5, ry: Math.PI / 2 },
+    { x: -232, z: -150, y: 1.3, ry: 0.3 }, { x: -270, z: -160, y: 1.3, ry: -0.2 },
+  ];
+  for (const s of contSpots) {
+    const c = new THREE.Mesh(contGeo, contMat);
+    c.position.set(s.x, s.y, s.z);
+    c.rotation.y = s.ry;
+    group.add(c);
+    colliders.push({ minX: s.x - 6, maxX: s.x + 6, minZ: s.z - 2, maxZ: s.z + 2 });
+  }
+  // dock crane: tower + jib + cable + hook
+  const crane = new THREE.Group();
+  const craneMat = new THREE.MeshLambertMaterial({ color: 0xffd23f });
+  const craneTower = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 3), craneMat);
+  craneTower.position.y = 13; crane.add(craneTower);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(26, 1.6, 1.6), craneMat);
+  jib.position.set(10, 25, 0); crane.add(jib);
+  const counterJib = new THREE.Mesh(new THREE.BoxGeometry(8, 1.6, 1.6), craneMat);
+  counterJib.position.set(-7, 25, 0); crane.add(counterJib);
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 14, 4),
+    new THREE.MeshLambertMaterial({ color: 0x222222 }));
+  cable.position.set(20, 18, 0); crane.add(cable);
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4),
+    new THREE.MeshLambertMaterial({ color: 0x333333 }));
+  hook.position.set(20, 11, 0); crane.add(hook);
+  // West end of the dock, by the pier — clear of the beach-boulevard cover
+  // camera's line of sight (it used to stand at (-252,-180) and block the
+  // whole center of the cover frame).
+  crane.position.set(dockX - 16, 0, dockZ + 0);
+  group.add(crane);
+  // cargo ship moored at the dock
+  const cargo = new THREE.Group();
+  cargo.add(box(14, 4, 46, 0x1b263b, 0, 2, 0));
+  cargo.add(box(10, 3, 8, 0xe63946, 0, 5.5, -14));
+  cargo.add(box(8, 2.4, 6, 0xffd23f, 0, 5.2, 6));
+  cargo.add(box(6, 2.4, 6, 0x4cc9f0, 0, 5.2, 14));
+  cargo.position.set(-318, 0.4, -150);
+  cargo.rotation.y = 0.15;
+  group.add(cargo);
+
+  // --- Ferris wheel at the north end of the beach (second landmark, seen from the beach road) ---
   const wheel = new THREE.Group();
   const wheelWhite = new THREE.MeshLambertMaterial({ color: 0xf4f4f4 });
   for (const s of [-1, 1]) {
@@ -504,12 +634,12 @@ export function buildCity(scene) {
   hub.rotation.x = Math.PI / 2;
   hub.position.y = 30;
   wheel.add(hub);
-  // Roda menghadap timur (ke jalan pantai) supaya bundar penuh dari kamera chase.
+  // The wheel faces east (toward the beach road) so it reads as a full circle from the chase camera.
   wheel.rotation.y = Math.PI / 2;
   wheel.position.set(-284, 0, -300);
   group.add(wheel);
 
-  // --- 4 kapal di laut (laut tidak boleh kosong dari kamera chase) ---
+  // --- 4 ships in the sea (the sea must not be empty from the chase camera) ---
   const shipSpots = [
     { x: -360, z: -260, c: 0xe63946 }, { x: -385, z: -60, c: 0x4cc9f0 },
     { x: -350, z: 120, c: 0xffd23f }, { x: -395, z: 240, c: 0x7ee081 },
@@ -529,7 +659,7 @@ export function buildCity(scene) {
     group.add(ship);
   }
 
-  // --- Papan nama distrik (signage besar, terbaca dari jauh) ---
+  // --- District name signs (big signage, readable from far away) ---
   for (const d of DISTRICTS) {
     const tex = textTexture([d.name, d.sub], { color: d.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -539,7 +669,7 @@ export function buildCity(scene) {
     sign.position.set(d.x, d.big ? 26 : 20, d.z);
     sign.rotation.y = d.ry !== undefined ? d.ry : Math.PI / 4;
     group.add(sign);
-    // tiang penyangga
+    // support pole
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.6, 0.6, d.big ? 16 : 12, 8),
       new THREE.MeshLambertMaterial({ color: 0x333333 }),
@@ -548,10 +678,10 @@ export function buildCity(scene) {
     group.add(pole);
   }
 
-  // --- Papan toko (signage kecil di trotoar dekat toko) ---
-  // Ukuran 12×5 di y=4 (setinggi mata) — papan 20×10 di y=12 terlalu tinggi:
-  // dari kamera orang ketiga yang menunduk ke pemain, papan setinggi itu
-  // jatuh DI ATAS tepi frame dan tidak terlihat sama sekali.
+  // --- Shop signs (small signs on the sidewalk near each shop) ---
+  // Size 12x5 at y=4 (eye level) — a 20x10 sign at y=12 is too high:
+  // from the third-person camera looking down at the player, a sign that
+  // high falls ABOVE the frame edge and is never seen at all.
   for (const s of SHOP_SIGNS) {
     const tex = textTexture([s.name, s.sub], { color: s.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -569,19 +699,46 @@ export function buildCity(scene) {
     group.add(pole);
   }
 
-  // --- Plaza Mercado: air mancur kecil ---
+  // --- Plaza Mercado: paved plaza + a fountain with a spout ---
+  // A light stone disc so the plaza reads as a paved square, not dirt.
+  const plaza = new THREE.Mesh(
+    new THREE.CircleGeometry(34, 24),
+    new THREE.MeshLambertMaterial({ color: 0xd8cbb0 }),
+  );
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.set(60, 0.06, 140);
+  group.add(plaza);
   const fountain = new THREE.Mesh(
     new THREE.CylinderGeometry(8, 9, 1.2, 16),
     new THREE.MeshLambertMaterial({ color: 0x9fd8ff }),
   );
   fountain.position.set(60, 0.6, 140);
   group.add(fountain);
+  const fountainRim = new THREE.Mesh(
+    new THREE.TorusGeometry(8.5, 0.5, 8, 24),
+    new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }),
+  );
+  fountainRim.rotation.x = Math.PI / 2;
+  fountainRim.position.set(60, 1.2, 140);
+  group.add(fountainRim);
+  const spout = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.9, 1.2, 2.6, 8),
+    new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }),
+  );
+  spout.position.set(60, 2.2, 140);
+  group.add(spout);
+  const spoutTop = new THREE.Mesh(
+    new THREE.SphereGeometry(1.3, 10, 8),
+    new THREE.MeshLambertMaterial({ color: 0x9fd8ff }),
+  );
+  spoutTop.position.set(60, 3.8, 140);
+  group.add(spoutTop);
 
   scene.add(group);
   return { group, colliders };
 }
 
-// Dorong posisi (lingkaran radius r) keluar dari AABB gedung.
+// Push a position (circle radius r) out of building AABBs.
 export function resolveColliders(pos, r, colliders) {
   for (const c of colliders) {
     if (pos.x > c.minX - r && pos.x < c.maxX + r && pos.z > c.minZ - r && pos.z < c.maxZ + r) {

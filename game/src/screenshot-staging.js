@@ -1,10 +1,11 @@
-// Mode screenshot deterministik — ?shot=chase|drive|walk|win
-// Menata scene, kamera CHASE 3D street-level (bukan top-down), wanted,
-// dan HUD persis untuk tiap shot, lalu membekukan simulasi supaya tiap
-// pengambilan gambar menghasilkan frame yang sama.
-// Kamera chase: rendah di belakang mobil, yaw sedikit ke kiri supaya laut +
-// pantai + mercusuar masuk frame; helikopter dipin eksplisit di langit
-// kiri-atas supaya UTUH di dalam frame (tidak terpotong tepi).
+// Deterministic screenshot mode — ?shot=cover|heist-night|combat-dock|plaza-shop
+// Stages the scene, the 3D street-level CHASE camera (not top-down), wanted,
+// and the HUD exactly for each shot, then freezes the simulation so every
+// capture produces the same frame.
+// Chase camera: low behind the car, yaw slightly left so the sea + beach +
+// lighthouse enter the frame; the helicopter is pinned explicitly in the
+// upper-left sky so it sits WHOLE inside the frame (not clipped by the edge).
+import * as THREE from 'three';
 import { CAR_MODELS, DIALOGS } from './config.js';
 
 export function parseShot() {
@@ -12,20 +13,26 @@ export function parseShot() {
   return { shot: q.get('shot') || null, seed: Number(q.get('seed') || 1) };
 }
 
-// Pindahkan satu mobil lalu lintas ke titik + heading yang ditentukan.
+// Move one traffic car to a set point + heading.
 function placeTrafficCar(tc, x, z, heading) {
   tc.car.pos.x = x; tc.car.pos.z = z;
   tc.car.heading = heading; tc.car.mesh.rotation.y = heading;
 }
 
-// Pindahkan satu pejalan kaki ke titik yang ditentukan.
+// Move one pedestrian to a set point.
 function placePed(pd, x, z) {
   pd.mesh.position.set(x, 0, z);
 }
 
-// Pin helikopter di langit kiri-atas frame (relatif terhadap kamera):
-// fwd meter ke depan, left meter ke kiri, y = ketinggian tetap.
-// Dipanggil SETELAH 20 langkah staging — orbit live tidak menggesernya lagi.
+// Move one dock thug to a set point (combat-dock shot).
+function placeEnemy(e, x, z) {
+  e.mesh.position.set(x, 0, z);
+  e.pos = e.mesh.position;
+}
+
+// Pin the helicopter in the upper-left sky (relative to the camera):
+// fwd meters forward, left meters to the left, y = fixed height.
+// Called AFTER the 20 staging steps — the live orbit no longer moves it.
 function pinHelicopter(game, fwd, left, height) {
   const p = game.police;
   if (!p.heli) return;
@@ -34,58 +41,60 @@ function pinHelicopter(game, fwd, left, height) {
   const cx = cam.position.x, cz = cam.position.z;
   let hx = tgt.x - cx, hz = tgt.z - cz;
   const hl = Math.hypot(hx, hz) || 1;
-  hx /= hl; hz /= hl; // maju (horizontal)
-  const lx = hz, lz = -hx; // kiri
+  hx /= hl; hz /= hl; // forward (horizontal)
+  const lx = hz, lz = -hx; // left
   const px = cx + hx * fwd + lx * left;
   const pz = cz + hz * fwd + lz * left;
   p.placeHelicopter(px, height, pz, Math.atan2(cx - px, cz - pz));
 }
 
-// Menata game untuk satu shot. Dipanggil sekali setelah dunia dibangun.
+// Stage the game for one shot. Called once after the world is built.
 export function stageShot(game, shot) {
   const g = game;
   g.shotMode = shot;
   g.started = true;
-  g.topDown = false; // v3: kamera chase, bukan top-down
+  g.topDown = false; // v5: chase camera, not top-down
   g.hud.hideScreen();
   const police = g.police;
   const setCarAt = (car, x, z, heading, speed) => {
     car.pos.x = x; car.pos.z = z; car.heading = heading;
     car.mesh.rotation.y = heading; car.speed = speed || 0;
   };
-  // Jam kota selalu DAY 1 18:24 di semua shot.
+  // City clock is always DAY 1 18:24 in every shot (overridden per shot below).
   g.clockDay = 1; g.clockMin = 18 * 60 + 24;
 
-  if (shot === 'chase') {
-    // COVER chase: kejar-kejaran di AVENUE PANTAI x=-240 menuju dermaga (utara).
-    // v4 "PANTAI VELA": kamera yaw 0.95 (memandang barat-laut) supaya LAUT +
-    // PASIR memenuhi separuh kiri frame, palem + payung pantai + matahari
-    // rendah di atas laut masuk frame; mercusuar utuh di tengah-kanan.
+  if (shot === 'cover') {
+    // COVER: golden-hour pursuit on the BEACH AVENUE x=-240, heading north
+    // to the pier. Vanishing-point camera: low, behind and slightly 3/4 of
+    // the big Cometa GT hero in the foreground. The sea + sand fill the left
+    // half of the frame, palms + beach umbrellas + the low sun over the sea,
+    // the Faro Vela lighthouse whole in the mid-right.
     const sport = CAR_MODELS.find((m) => m.id === 'sport');
     g.enterCar(g.playerCar(sport, -240, -170, Math.PI));
-    // Kecepatan 0 SELAMA staging: 20 langkah stepWorld menggerakkan mobil
-    // ~11 m ke utara dan ikut menggeser kamera — framing (mercusuar utuh di
-    // frame) dihitung dari posisi ini. Kecepatan 36 (130 km/jam) dipulihkan
-    // di bagian HUD final, setelah langkah staging selesai.
+    // Speed 0 DURING staging: 20 stepWorld steps move the car ~11 m north
+    // and drag the camera with it — the framing (lighthouse whole in frame)
+    // is computed from this position. Speed 36 (130 km/h) is restored in
+    // the final HUD section, after staging is done.
     g.player.car.speed = 0;
     g.player.car.condition = 78;
     police.wanted = 4; police.heat = 1;
     police.ensureUnits(g.player.pos);
     police.cars.forEach((pc, i) => {
-      // Jarak 22-38 m: polisi mendekat selama staging tapi tidak sampai
-      // menabrak mobil pemain (yang kini diam).
-      const spots = [[-236.5, -192], [-243.5, -200], [-236.5, -208]];
+      // 22-38 m away, SPREAD ACROSS the road (not single file): the police
+      // close in during staging but never reach the player's (now
+      // stationary) car, and they stay visible on both sides of the hero.
+      const spots = [[-232, -192], [-248, -200], [-238, -208]];
       setCarAt(pc, spots[i][0], spots[i][1], Math.PI, 34 + i);
     });
     police.ensureHelicopter(g.player.pos);
-    // Lalu lintas di jalan pantai + jalan sebelah — semuanya di DEPAN kamera.
+    // Traffic on the beach road + the road beside it — all IN FRONT of the camera.
     const trafficSpots = [
       [-236.5, -190, Math.PI], [-243.5, -210, 0], [-236.5, -240, Math.PI],
       [-243.5, -265, 0], [-236.5, -285, Math.PI], [-243.5, -225, 0],
       [-156.5, -200, Math.PI], [-163.5, -230, 0], [-156.5, -260, Math.PI], [-163.5, -190, 0],
     ];
     g.traffic.slice(0, 10).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
-    // Pejalan kaki di trotoar pantai + pasir, di depan kamera.
+    // Pedestrians on the beach sidewalk + the sand, in front of the camera.
     const pedSpots = [
       [-256, -185], [-229, -195], [-258, -215], [-231, -225], [-254, -245],
       [-262, -270], [-230, -255], [-257, -200], [-228, -280], [-253, -290],
@@ -94,122 +103,153 @@ export function stageShot(game, shot) {
     g.missions.index = 7; g.missions.state = 'active'; g.missions.timer = 132;
     g.missions.marker.visible = true;
     g.missions.marker.position.set(-292, 0, -198);
-    // Kamera chase: yaw 1.00 ke kiri (laut memenuhi separuh frame), pitch
-    // 0.09 + jarak 17 supaya puncak mercusuar + ferris wheel UTUH di frame
-    // (sudut pandang ke bawah hanya ~10°, tepi atas frame di +21°).
-    g.cameraYaw = 1.00; g.cameraPitch = 0.09; g.camDist = 17; g.cameraSide = 0; g.camLookSide = 0;
-    g.money = 18450; // misi 8/8, DAY 3 — pemain akhir game harus kaya (juara $12-48rb)
+    // Chase camera: yaw 1.15 to the west (sea fills the left half),
+    // pitch 0.12 + distance 11 so the big Cometa GT hero fills the
+    // foreground and the lighthouse + ferris wheel sit whole on the horizon
+    // (the downward view angle is only ~12°, the top frame edge is at +23°).
+    g.cameraYaw = 1.15; g.cameraPitch = 0.12; g.camDist = 11; g.cameraSide = 0; g.camLookSide = 0;
+    g.money = 18450; // mission 8/8, DAY 3 — an endgame player must be rich (champions $12-48k)
     g.clockDay = 3; g.clockMin = 18 * 60 + 36;
     g.player.armour = 54;
     g.respect = 4;
-    g.combat.hasPistol = true; g.combat.ammo = 24; g.combat.weapon = 'pistol';
-  } else if (shot === 'drive') {
-    // HEIST — kabur dari Bank Vela MENYUSUR AVENUE PANTAI (v4): pemain + 2 polisi
-    // di jalan pantai x=-240 menuju dermaga; laut + palem di kiri frame.
+    g.combat.hasPistol = true; g.combat.ammo.pistol = 24; g.combat.weapon = 'pistol';
+  } else if (shot === 'heist-night') {
+    // HEIST NIGHT: the Vela Bank escape in the Glass District, at NIGHT
+    // (the city was built with { night: true }). The player in a coupe on
+    // road x=160 heading north, the VELA BANK neon sign + glass towers
+    // ahead-right, 4 stars, a roadblock car ahead, the helicopter
+    // searchlight cone cutting the dark sky.
     const coupe = CAR_MODELS.find((m) => m.id === 'coupe');
-    g.enterCar(g.playerCar(coupe, -240, 40, Math.PI));
-    // Kecepatan 0 selama staging (seperti cover) — dipulihkan ke 30
-    // (108 km/jam) di bagian HUD final.
+    g.enterCar(g.playerCar(coupe, 160, -120, Math.PI));
+    // Speed 0 during staging (like the cover) — restored to 30
+    // (108 km/h) in the final HUD section.
     g.player.car.speed = 0;
     g.player.car.condition = 85;
-    police.wanted = 2; police.heat = 1;
+    police.wanted = 4; police.heat = 1;
     police.ensureUnits(g.player.pos);
     police.cars.forEach((pc, i) => {
-      const spots = [[-236.5, 0], [-243.5, -16]];
-      setCarAt(pc, spots[i][0], spots[i][1], Math.PI, 28 + i);
+      // two chasers behind, one roadblock ahead (facing the player)
+      const spots = [[156, -100], [164, -90], [160, -150]];
+      const headings = [Math.PI, Math.PI, 0];
+      setCarAt(pc, spots[i][0], spots[i][1], headings[i], 28 + i);
     });
+    police.ensureHelicopter(g.player.pos);
     const trafficSpots = [
-      [-236.5, 20, Math.PI], [-243.5, 0, 0], [-236.5, -20, Math.PI], [-243.5, -40, 0],
-      [-236.5, 60, Math.PI], [-243.5, 80, 0], [-156.5, 20, Math.PI], [-163.5, 0, 0],
+      [156, -140, Math.PI], [164, -160, 0], [156, -180, Math.PI], [164, -200, 0],
+      [120, -156, Math.PI / 2], [200, -164, -Math.PI / 2], [80, -160, Math.PI / 2], [240, -160, -Math.PI / 2],
     ];
     g.traffic.slice(0, 8).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
-    const pedSpots = [[-256, 55], [-229, 30], [-258, 20], [-231, 10], [-254, -10], [-262, -30]];
+    const pedSpots = [[150, -110], [170, -130], [148, -150], [172, -170], [150, -190], [170, -100]];
     g.peds.slice(0, 6).forEach((pd, i) => placePed(pd, ...pedSpots[i]));
     g.missions.index = 5; g.missions.state = 'active'; g.missions.timer = 150;
-    g.missions.heistGrabbed = true; // rampasan sudah di tangan — fase kabur
+    g.missions.heistGrabbed = true; // the loot is in hand — the escape phase
     g.missions.marker.visible = true;
     g.missions.marker.position.set(-292, 0, -198);
-    g.cameraYaw = 0.85; g.cameraPitch = 0.18; g.camDist = 12; g.cameraSide = 0; g.camLookSide = 0;
-    g.money = 12450; // rampasan heist — uang besar (juara $12-48rb)
-    g.clockDay = 3; g.clockMin = 18 * 60 + 36;
+    // Camera behind the car, looking north up road x=160: the bank neon +
+    // glass towers ahead-right, the road vanishing ahead.
+    g.cameraYaw = 0; g.cameraPitch = 0.14; g.camDist = 12; g.cameraSide = 0; g.camLookSide = 0;
+    g.money = 12450; // heist loot — big money (champions $12-48k)
+    g.clockDay = 3; g.clockMin = 21 * 60 + 30;
     g.player.armour = 50;
     g.respect = 3;
-    // Kru heist bersenjata — pistol aktif di shot kabur.
-    g.combat.hasPistol = true; g.combat.ammo = 18; g.combat.weapon = 'pistol';
-  } else if (shot === 'walk') {
-    // TOKO — jalan kaki di jalan z=60, menghadap papan "TOKO SENJATA" di
-    // dinding utara gedung (120,80) — papan lurus di tengah frame, di belakang
-    // pemain, dengan menu beli TERBUKA (pistol / amunisi / armour).
-    // Pemain di (114,58): 6,3 m dari trigger toko (120,60) — toko terbuka;
-    // kamera 5,5 m di belakang pemain, di jalan (tidak di dalam gedung).
-    g.player.pos.x = 114; g.player.pos.z = 58;
-    g.player.heading = 0.90; // menghadap papan TOKO SENJATA (126, 67.6)
-    g.player.mesh.rotation.y = 0.90;
+    // The heist crew is armed — pistol active in the escape shot.
+    g.combat.hasPistol = true; g.combat.ammo.pistol = 18; g.combat.weapon = 'pistol';
+  } else if (shot === 'combat-dock') {
+    // COMBAT DOCK: on foot at Puerto Vela Docks, mid-shootout. The
+    // articulated player aims a pistol at three dock thugs between the
+    // player and the cargo ship — containers to the right, the dock crane
+    // and the ship + sea ahead. Static muzzle flash + tracer are placed
+    // after staging (deterministic — no timer).
+    g.player.pos.x = -235; g.player.pos.z = -135;
+    g.player.heading = -1.75; // facing west, toward the crane + cargo ship + sea
+    g.player.mesh.rotation.y = -1.75;
     police.wanted = 1; police.heat = 0.9;
     police.ensureUnits(g.player.pos);
+    // Thugs in front of the player, between the player and the ship.
+    g.spawnEnemies();
+    const enemySpots = [[-260, -140], [-270, -150], [-255, -155]];
+    g.enemies.forEach((e, i) => placeEnemy(e, ...enemySpots[i]));
+    // Dock workers + a couple of peds on the pier road.
     const pedSpots = [
-      [100, 50], [120, 92], [140, 60], [96, 72], [128, 40], [150, 68],
-      [88, 60], [108, 92], [136, 48], [104, 36], [120, 20], [144, 92],
-      [92, 40], [116, 94], [132, 68], [100, 94],
+      [-240, -100], [-220, -80], [-250, -70], [-210, -100], [-260, -110], [-230, -70],
     ];
-    g.peds.slice(0, 16).forEach((pd, i) => placePed(pd, ...pedSpots[i]));
+    g.peds.slice(0, 6).forEach((pd, i) => placePed(pd, ...pedSpots[i]));
     const trafficSpots = [
-      [77, 40, 0], [83, 100, Math.PI], [157, 20, 0], [163, 60, Math.PI],
-      [40, 3, Math.PI / 2], [120, -3, -Math.PI / 2], [60, 77, Math.PI / 2],
+      [-236, -60, Math.PI], [-244, -40, 0], [-160, -80, Math.PI / 2], [-80, -160, 0],
     ];
-    g.traffic.slice(0, 7).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
-    g.missions.index = 0; g.missions.state = 'active';
+    g.traffic.slice(0, 4).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
+    g.missions.index = 6; g.missions.state = 'active';
     g.missions.marker.visible = true;
-    g.missions.marker.position.set(60, 0, 140);
-    // Kamera di belakang pemain jalan kaki (heading + PI), jarak 6,5 m,
-    // pitch rendah (0.12) supaya papan toko (y=4) masuk frame di atas pemain.
-    g.cameraYaw = 0.90 + Math.PI; g.cameraPitch = 0.12; g.camDist = 6.5; g.cameraSide = 0; g.camLookSide = 0;
-    g.money = 210;
-    g.player.armour = 50;
-    g.respect = 1;
-  } else if (shot === 'win') {
-    // Layar MISI SELESAI di atas jalan ramai: 6 lalu lintas + 6 pejalan kaki.
-    // Titik bidik digeser 5 m ke kiri (camLookSide) supaya mobil pemain
-    // tampak di sisi kanan frame, tidak tertutup tombol LANJUTKAN.
-    // (cameraSide saja TIDAK cukup — ia menggeser kamera + bidik bersamaan,
-    // jadi mobil tetap di tengah layar.)
-    const sedan = CAR_MODELS.find((m) => m.id === 'sedan');
-    g.enterCar(g.playerCar(sedan, 0, 120, Math.PI));
-    g.player.car.speed = 0;
-    g.player.car.condition = 100;
+    g.missions.marker.position.set(-260, 0, -145);
+    // Camera behind the player on foot (heading + PI), close and low so the
+    // player + thugs + crane + cargo ship all fit in the frame.
+    g.cameraYaw = -1.75 + Math.PI; g.cameraPitch = 0.12; g.camDist = 8; g.cameraSide = 0; g.camLookSide = 0;
+    g.money = 870;
+    g.clockDay = 2; g.clockMin = 16 * 60 + 40;
+    g.player.armour = 62;
+    g.respect = 2;
+    g.combat.hasPistol = true; g.combat.ammo.pistol = 24; g.combat.weapon = 'pistol';
+  } else if (shot === 'plaza-shop') {
+    // PLAZA SHOP: bright afternoon at Plaza Mercado. The player on foot by
+    // the fountain, cars + palms + the market around, the KOTA TUA sign in
+    // frame. A compact "MISSION PASSED! +$5,000" banner (the #message line,
+    // not a dark modal) sits at the top — over 75% of the 3D city stays
+    // fully visible.
+    g.player.pos.x = 60; g.player.pos.z = 120;
+    g.player.heading = 0; // facing south (+z), toward the fountain at (60, 140)
+    g.player.mesh.rotation.y = 0;
     police.wanted = 0;
     const trafficSpots = [
-      [3, 60, 0], [-3, 40, Math.PI], [3, 20, 0],
-      [40, 77, Math.PI / 2], [-60, 83, -Math.PI / 2], [-40, 60, Math.PI / 2],
+      [76, 120, 0], [84, 160, Math.PI], [76, 200, 0], [84, 80, Math.PI],
+      [40, 156, Math.PI / 2], [120, 164, -Math.PI / 2], [0, 160, Math.PI / 2], [160, 160, -Math.PI / 2],
     ];
-    g.traffic.slice(0, 6).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
-    const pedSpots = [[12, 110], [-12, 100], [12, 90], [-12, 80], [20, 105], [-20, 95]];
-    g.peds.slice(0, 6).forEach((pd, i) => placePed(pd, ...pedSpots[i]));
+    g.traffic.slice(0, 8).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
+    const pedSpots = [
+      [52, 130], [68, 135], [56, 150], [64, 110], [72, 145], [48, 140],
+      [60, 160], [76, 125], [44, 120], [70, 155], [52, 105], [66, 165],
+    ];
+    g.peds.slice(0, 12).forEach((pd, i) => placePed(pd, ...pedSpots[i]));
+    // Mission 1 just passed — mission 2 (taxi) is next.
     g.missions.index = 1; g.missions.state = 'idle';
-    // Yaw -0.10 (sedikit ke kanan) supaya papan VELAMAR bergeser ke kiri
-    // frame, tidak menutupi bintang wanted di kanan-atas.
-    g.cameraYaw = -0.10; g.cameraPitch = 0.18; g.camDist = 12; g.cameraSide = 0; g.camLookSide = -5;
-    g.money = 870;
-    g.player.armour = 50;
-    g.respect = 1;
-    g.hud.showScreen('MISI SELESAI!',
-      '<b>Pesan Pertama</b> — paket sampai di Plaza Mercado.<br>Hadiah: <b style="color:#ffd23f">$120</b> &nbsp;•&nbsp; Total: <b>$870</b><br>Misi berikutnya: <b>Taksi Kilat</b> — penumpang menunggu di Pantai Azul.',
-      'LANJUTKAN', () => {});
-    document.getElementById('screen').style.background = 'rgba(5,12,24,.45)';
+    g.missions.marker.visible = true;
+    g.missions.marker.position.set(-180, 0, 190);
+    // Camera behind the player, looking south at the fountain + market.
+    g.cameraYaw = Math.PI; g.cameraPitch = 0.15; g.camDist = 7; g.cameraSide = 0; g.camLookSide = 0;
+    g.money = 5050; // $5,000 mission bonus + $50 starting cash
+    g.clockDay = 2; g.clockMin = 14 * 60 + 30;
+    g.player.armour = 100;
+    g.respect = 2;
   }
-  // Bekukan simulasi setelah 20 langkah tetap supaya lalu lintas & polisi tertata.
+  // Freeze the simulation after 20 fixed steps so traffic & police settle.
   for (let i = 0; i < 20; i++) g.stepWorld(1 / 60, true);
-  // Helikopter cover: pin di langit kiri-atas SETELAH orbit live — utuh di frame.
-  // v4: fwd 70 (lebih BESAR tapi tidak terpotong) + kiri 20 + tinggi 15 —
-  // ketinggian 15 m dari tanah menaruh heli ~60% ke atas frame, bebas dari
-  // siluet mercusuar yang kini di tengah-kanan.
-  if (shot === 'chase') pinHelicopter(g, 70, 20, 15);
-  // HUD final SETELAH staging — stepWorld menimpa teks objektif tiap frame.
+  // Helicopter: pin it in the upper-left sky AFTER the live orbit — whole in frame.
+  // cover: fwd 70 (bigger but not clipped) + left 20 + height 15 —
+  // height 15 m puts the heli ~60% up the frame, clear of the lighthouse
+  // silhouette now in the mid-right.
+  if (shot === 'cover') pinHelicopter(g, 70, 20, 15);
+  if (shot === 'heist-night') pinHelicopter(g, 60, 15, 20);
+  // Combat-dock: static muzzle flash + tracer (deterministic — no timer).
+  if (shot === 'combat-dock') {
+    const fwd = { x: Math.sin(g.player.heading), z: Math.cos(g.player.heading) };
+    const muzzle = new THREE.Vector3(
+      g.player.pos.x + fwd.x * 1.2, 1.4, g.player.pos.z + fwd.z * 1.2,
+    );
+    g.combat.staticFlash(muzzle, new THREE.Vector3(fwd.x, 0, fwd.z));
+    // tracer from the muzzle to the nearest thug
+    const thug = g.enemies[0];
+    if (thug) {
+      const end = new THREE.Vector3(thug.pos.x, 1.2, thug.pos.z);
+      const geo = new THREE.BufferGeometry().setFromPoints([muzzle, end]);
+      const tracer = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe66d }));
+      g.scene.add(tracer);
+    }
+  }
+  // Final HUD AFTER staging — stepWorld overwrites the objective text every frame.
   const hudFinal = {
-    chase: ['MISSION 8/8 · PELARIAN TERAKHIR', 'Capai kapal di ujung dermaga! Polisi 4 bintang mengejarmu.', 132],
-    drive: ['MISSION 6/8 · RAMPOK BANK VELA', 'Uang rampasan didapat! Kabur ke dermaga sebelum polisi mengepung!', 150],
-    walk: ['MISSION 1/8 · PESAN PERTAMA', 'Antar paket ke Plaza Mercado. Jangan buka isinya.', 0],
-    win: ['MISSION 1/8 · PESAN PERTAMA', 'Paket diantar. Mara senang — $120 masuk.', 0],
+    cover: ['MISSION 8/8 · THE LAST RUN', 'Reach the boat at the end of the pier before time runs out!', 132],
+    'heist-night': ['MISSION 6/8 · VELA BANK HEIST', 'Loot secured! Run for the pier before the cops close in!', 150],
+    'combat-dock': ['MISSION 7/8 · SHOOT BACK', 'Three dock thugs are waiting for you. Drop them all.', 0],
+    'plaza-shop': ['MISSION 2/8 · FLASH CAB', 'A fare is waiting at Playa Azul. Get them to Faro Vela, fast!', 0],
   }[shot];
   if (hudFinal) {
     g.hud.setObjective(hudFinal[0], hudFinal[1]);
@@ -224,47 +264,30 @@ export function stageShot(game, shot) {
   g.hud.setHealth(g.player.health);
   g.hud.setArmour(g.player.armour);
   g.hud.setRespect(g.respect);
-  if (shot === 'chase') {
-    g.hud.setWeapon('🔫 PISTOL VELA — 24/120');
-    g.hud.setWeaponSlots([
-      { icon: '✊', name: 'FISTS', ammo: '∞' },
-      { icon: '🔫', name: 'PISTOL', ammo: '24/120', active: true },
-      { icon: '🔫', name: 'SMG', ammo: '', locked: true },
-      { icon: '🔫', name: 'SHOTGUN', ammo: '', locked: true },
-    ]);
-  } else if (shot === 'drive') {
-    g.hud.setWeapon('🔫 PISTOL VELA — 18/120');
-    g.hud.setWeaponSlots([
-      { icon: '✊', name: 'FISTS', ammo: '∞' },
-      { icon: '🔫', name: 'PISTOL', ammo: '18/120', active: true },
-      { icon: '🔫', name: 'SMG', ammo: '', locked: true },
-      { icon: '🔫', name: 'SHOTGUN', ammo: '', locked: true },
-    ]);
-  } else {
-    // Baris senjata PENDEK saat tangan kosong — teks panjang menabrak kotak slot.
-    g.hud.setWeapon('✊ TANGAN KOSONG');
-    g.hud.setWeaponSlots([
-      { icon: '✊', name: 'FISTS', ammo: '∞', active: true },
-      { icon: '🔫', name: 'PISTOL', ammo: '', locked: true },
-      { icon: '🔫', name: 'SMG', ammo: '', locked: true },
-      { icon: '🔫', name: 'SHOTGUN', ammo: '', locked: true },
-    ]);
-  }
+  // Weapon line + slots from the combat state (also shows the gun in the
+  // player's hand for the on-foot shot).
+  g.updateWeaponLine();
   g.hud.setClock(g.clockDay, Math.floor(g.clockMin / 60), Math.floor(g.clockMin % 60));
-  const missionId = { chase: 8, drive: 6, walk: 1, win: 1 }[shot];
+  const missionId = { cover: 8, 'heist-night': 6, 'combat-dock': 7, 'plaza-shop': 2 }[shot];
   const dlg = DIALOGS[missionId];
   if (dlg) g.hud.setDialog(dlg.giver, dlg.line);
-  const district = { chase: 'PELABUHAN VELA', drive: 'VELAMAR', walk: 'KOTA TUA', win: 'KOTA TUA' }[shot];
+  const district = { cover: 'PUERTO VELA', 'heist-night': 'GLASS DISTRICT', 'combat-dock': 'PUERTO VELA', 'plaza-shop': 'KOTA TUA' }[shot];
   g.hud.setDistrict(district);
-  g.hud.setRadio('🎵 SOL FM 95.4 — SYNTHWAVE');
-  // Pulihkan kecepatan kejar-kejaran SETELAH 20 langkah staging: gesekan
-  // (drive() tanpa gas) menggerus 36 -> 26 m/dtk selama staging, jadi HUD
-  // menampilkan 95 bukan 130 km/jam. Game dibekukan setelah ini, jadi angka
-  // ini yang tampil di screenshot — kecepatan kejar yang sebenarnya.
-  if (shot === 'chase') g.player.car.speed = 36;
-  else if (shot === 'drive') g.player.car.speed = 30;
-  // Jarak dihitung dari posisi AKHIR (setelah staging) — angka asli, bukan karangan.
-  if (shot === 'win') {
+  const radio = {
+    cover: '🎵 SOL FM 95.4 — SYNTHWAVE',
+    'heist-night': '🎵 NIGHTWIRE 88.7 — NIGHT DRIVE',
+    'combat-dock': '🎵 VELA WAVE 101.2 — CHILLWAVE',
+    'plaza-shop': '🎵 VELA WAVE 101.2 — CHILLWAVE',
+  }[shot];
+  g.hud.setRadio(radio);
+  // Restore the chase speed AFTER the 20 staging steps: friction
+  // (drive() without gas) grinds 36 -> 26 m/s during staging, so the HUD
+  // would show 95 instead of 130 km/h. The game is frozen after this, so
+  // this is the number in the screenshot — the real chase speed.
+  if (shot === 'cover') g.player.car.speed = 36;
+  else if (shot === 'heist-night') g.player.car.speed = 30;
+  // Distance is computed from the FINAL position (after staging) — a real number, not invented.
+  if (shot === 'plaza-shop') {
     g.hud.setDistance(null);
   } else {
     const tgt = g.missions.targetPos();
@@ -272,16 +295,17 @@ export function stageShot(game, shot) {
   }
   g.hud.setSpeed(g.player.inCar ? g.player.car.kmh() : 0, g.player.inCar);
   g.hud.setCarName(g.player.inCar ? g.player.car.model.name : '');
-  // Bersihkan pesan "Mobil dicuri!" dari staging — lalu ganti dengan teks
-  // feedback aksi (ala juara): sinyal "sesuatu sedang terjadi SEKARANG".
+  // Clear the "Car stolen!" message from staging — then replace it with
+  // action feedback text (champion style): a signal that something is
+  // happening RIGHT NOW.
   g.hud.messageTimer = 0;
   g.hud.el.message.style.opacity = '0';
-  if (shot === 'chase') g.hud.showMessage('🔥 NEAR MISS +$250', 999);
-  else if (shot === 'drive') g.hud.showMessage('🚧 ROADBLOCK AHEAD', 999);
-  // Shot menang: sembunyikan prompt "[E] Keluar mobil" — jangan menutupi mobil pemain.
-  if (shot === 'win') g.hud.showPrompt(null);
-  // Shot toko: buka menu beli SETELAH HUD final — pemain memang berdiri di depan toko.
-  if (shot === 'walk') g.openShop('weapon');
+  if (shot === 'cover') g.hud.showMessage('🔥 NEAR MISS +$250', 999);
+  else if (shot === 'heist-night') g.hud.showMessage('🚧 ROADBLOCK AHEAD', 999);
+  else if (shot === 'combat-dock') g.hud.showMessage('⚠️ THUGS OPEN FIRE', 999);
+  else if (shot === 'plaza-shop') g.hud.showMessage('🏆 MISSION PASSED! +$5,000', 999);
+  // Plaza-shop: hide the "[E] Exit Vehicle" prompt — nothing to enter here.
+  if (shot === 'plaza-shop') g.hud.showPrompt(null);
   g.frozen = true;
   g.renderOnce();
   window.__VELAMAR_READY__ = true;

@@ -1,53 +1,89 @@
-// Combat — pukulan (F) + pistol (klik kiri, tombol 1/2 ganti senjata).
-// Musuh dermaga (misi 7): kapsul merah yang menembak balik dari jarak dekat.
+// Combat — punches (F) + 4 functional weapons (keys 1-4: Fists, Pistol,
+// Micro-SMG, Shotgun). Dock enemies (mission 7): articulated thugs who
+// shoot back from close range. Muzzle flash + bullet tracers included.
 import * as THREE from 'three';
+import { WEAPONS, WORLD } from './config.js';
+import { makeHuman, aimPose } from './human.js';
+import { makeRng } from './random.js';
 
 export class Combat {
   constructor(scene) {
     this.scene = scene;
-    this.weapon = 'fist'; // fist | pistol
-    this.ammo = 0;
-    this.hasPistol = false;
+    this.weapon = 'fist'; // fist | pistol | smg | shotgun
+    this.ammo = { pistol: 0, smg: 0, shotgun: 0 };
+    this.owned = { pistol: false, smg: false, shotgun: false };
     this.cooldown = 0;
     this.tracer = null;
+    this.flash = null;
+    this.flashTimer = 0;
   }
-  buyPistol() { this.hasPistol = true; this.ammo += 12; }
-  buyAmmo() { if (this.hasPistol) this.ammo += 12; }
-  update(dt) { this.cooldown = Math.max(0, this.cooldown - dt); }
-  // Pukulan: musuh/pejalan kaki dalam 2,2 m di depan pemain.
+  get hasPistol() { return this.owned.pistol; }
+  set hasPistol(v) { this.owned.pistol = v; if (v && this.ammo.pistol === 0) this.ammo.pistol = 12; }
+  buyWeapon(id) {
+    this.owned[id] = true;
+    this.ammo[id] = Math.max(this.ammo[id], WEAPONS[id].ammo === Infinity ? 0 : 12);
+    this.weapon = id;
+  }
+  buyPistol() { this.buyWeapon('pistol'); }
+  buyAmmo(id = 'pistol') {
+    if (!this.owned[id]) return;
+    const w = WEAPONS[id];
+    this.ammo[id] = Math.min(w.ammo, this.ammo[id] + 12);
+  }
+  ammoFor(id) { return id === 'fist' ? Infinity : this.ammo[id]; }
+  update(dt) {
+    this.cooldown = Math.max(0, this.cooldown - dt);
+    if (this.flash) {
+      this.flashTimer -= dt;
+      if (this.flashTimer <= 0) { this.scene.remove(this.flash); this.flash = null; }
+    }
+  }
+  // Punch: an enemy / pedestrian within 2.4 m in front of the player.
   punch(player, targets, onHit) {
     if (this.cooldown > 0) return false;
-    this.cooldown = 0.45;
+    this.cooldown = WEAPONS.fist.rate;
     const fx = Math.sin(player.heading), fz = Math.cos(player.heading);
     for (const t of targets) {
       const dx = t.pos.x - player.pos.x, dz = t.pos.z - player.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d < 2.4 && (dx * fx + dz * fz) > 0) { onHit(t, 34); return true; }
+      if (d < WEAPONS.fist.range && (dx * fx + dz * fz) > 0) { onHit(t, WEAPONS.fist.damage); return true; }
     }
     return false;
   }
-  // Tembakan: raycast sederhana ke target terdekat di arah kamera.
+  // Shoot: raycast to the nearest target in the camera direction.
+  // Shotgun fires 5 pellets with spread; SMG is fast with a wider cone.
   shoot(player, camera, targets, onHit) {
-    if (this.weapon !== 'pistol' || !this.hasPistol) return 'no-weapon';
-    if (this.ammo <= 0) return 'no-ammo';
+    const w = WEAPONS[this.weapon];
+    if (!w || this.weapon === 'fist') return 'no-weapon';
+    if (!this.owned[this.weapon]) return 'no-weapon';
+    if (this.ammo[this.weapon] <= 0) return 'no-ammo';
     if (this.cooldown > 0) return 'cooling';
-    this.cooldown = 0.35;
-    this.ammo -= 1;
+    this.cooldown = w.rate;
+    this.ammo[this.weapon] -= 1;
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     const origin = camera.position.clone();
-    let best = null, bestT = 120;
-    for (const t of targets) {
-      const to = new THREE.Vector3(t.pos.x - origin.x, 1.2 - origin.y, t.pos.z - origin.z);
-      const dist = to.length();
-      if (dist > 90) continue;
-      const cos = to.normalize().dot(dir);
-      if (cos > 0.985 && dist < bestT) { bestT = dist; best = t; }
+    const pellets = w.pellets || 1;
+    let hits = 0;
+    for (let k = 0; k < pellets; k++) {
+      // deterministic spread in shot mode: pellets fan out by index, not random
+      const spread = w.spread * (pellets === 1 ? 0 : (k - (pellets - 1) / 2) / ((pellets - 1) / 2));
+      const d = dir.clone();
+      d.x += spread * 0.6; d.y += spread * 0.3; d.normalize();
+      let best = null, bestT = w.range;
+      for (const t of targets) {
+        const to = new THREE.Vector3(t.pos.x - origin.x, 1.2 - origin.y, t.pos.z - origin.z);
+        const dist = to.length();
+        if (dist > w.range) continue;
+        const cos = to.normalize().dot(d);
+        if (cos > 0.985 && dist < bestT) { bestT = dist; best = t; }
+      }
+      if (best) { onHit(best, w.damage); hits += 1; }
     }
-    // garis tembak singkat
-    this.showTracer(origin, dir, best ? bestT : 40);
-    if (best) onHit(best, 50);
-    return best ? 'hit' : 'miss';
+    // bright tracer line + muzzle flash at the camera
+    this.showTracer(origin, dir, 40);
+    this.showMuzzle(origin, dir);
+    return hits > 0 ? 'hit' : 'miss';
   }
   showTracer(origin, dir, len) {
     if (this.tracer) this.scene.remove(this.tracer);
@@ -57,37 +93,88 @@ export class Combat {
     this.scene.add(this.tracer);
     setTimeout(() => { if (this.tracer) { this.scene.remove(this.tracer); this.tracer = null; } }, 70);
   }
+  // Muzzle flash: a bright star at the muzzle, fading fast.
+  showMuzzle(origin, dir) {
+    if (this.flash) this.scene.remove(this.flash);
+    const g = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xfff2a0 }),
+    );
+    g.add(core);
+    for (let k = 0; k < 4; k++) {
+      const spike = new THREE.Mesh(
+        new THREE.ConeGeometry(0.09, 0.9, 4),
+        new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.9 }),
+      );
+      spike.rotation.z = (k * Math.PI) / 2;
+      spike.position.set(0, 0, 0.3);
+      g.add(spike);
+    }
+    g.position.copy(origin).add(dir.clone().multiplyScalar(2.2));
+    g.lookAt(origin.clone().add(dir.clone().multiplyScalar(10)));
+    this.scene.add(g);
+    this.flash = g;
+    this.flashTimer = 0.09;
+  }
+  // Static muzzle flash for screenshot staging (deterministic — no timer).
+  staticFlash(pos, dir) {
+    const g = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xfff2a0 }),
+    );
+    g.add(core);
+    for (let k = 0; k < 4; k++) {
+      const spike = new THREE.Mesh(
+        new THREE.ConeGeometry(0.1, 1.0, 4),
+        new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.9 }),
+      );
+      spike.rotation.z = (k * Math.PI) / 2;
+      spike.position.set(0, 0, 0.35);
+      g.add(spike);
+    }
+    g.position.copy(pos);
+    g.lookAt(pos.clone().add(dir));
+    this.scene.add(g);
+    return g;
+  }
 }
 
-// Musuh misi 7 — preman dermaga.
+// Dock thug (mission 7) — an articulated human in a red jacket who shoots back.
 export class Enemy {
-  constructor(scene, x, z) {
-    this.mesh = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 1.05, 4, 8),
-      new THREE.MeshLambertMaterial({ color: 0x9d0208 }));
-    body.position.y = 1.05; this.mesh.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8),
-      new THREE.MeshLambertMaterial({ color: 0xf1c27d }));
-    head.position.y = 2.1; this.mesh.add(head);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.12, 10),
-      new THREE.MeshLambertMaterial({ color: 0x111111 }));
-    band.position.y = 2.32; this.mesh.add(band);
+  constructor(scene, x, z, seed = 0) {
+    this.mesh = makeHuman({
+      skin: 0xf1c27d,
+      jacket: 0x9d0208,
+      pants: 0x1a1a1a,
+      hair: 0x111111,
+      band: true,
+      bandColor: 0x111111,
+      weapon: 'pistol',
+    });
+    aimPose(this.mesh);
     this.mesh.position.set(x, 0, z);
     this.health = 100;
-    this.shootCd = 1.5 + Math.random();
+    this.rng = makeRng(WORLD.seed + 400 + seed);
+    this.shootCd = 1.5 + this.rng();
     this.pos = this.mesh.position;
+    this.animT = this.rng() * 10;
     scene.add(this.mesh);
   }
   update(dt, playerPos, onShoot) {
+    this.animT += dt;
     const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z;
     const d = Math.hypot(dx, dz);
     if (d > 14) {
       this.pos.x += (dx / d) * 3.2 * dt; this.pos.z += (dz / d) * 3.2 * dt;
     }
     this.mesh.rotation.y = Math.atan2(dx, dz);
+    // aim while close
+    aimPose(this.mesh);
     this.shootCd -= dt;
     if (d < 26 && this.shootCd <= 0) {
-      this.shootCd = 1.6 + Math.random() * 0.8;
+      this.shootCd = 1.6 + this.rng() * 0.8;
       onShoot(d < 20);
     }
   }

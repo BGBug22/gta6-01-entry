@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>VELAMAR — Kota Pelabuhan Matahari | Make GTA 6</title>
+<title>VELAMAR — Sunny Harbor City | Make GTA 6</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1526;
@@ -34,6 +34,9 @@
   .pu-tac.BOXINGIN { background: #ff8c42; color: #12233d; }
   .pu-tac.PURSUIT { background: #ffd23f; color: #12233d; }
   .pu-tac.SEARCHLIGHT { background: #4cc9f0; color: #12233d; }
+  .pu-tac.ROADBLOCK { background: #9d4edd; color: #fff; }
+  #police-summary { font-size: 11px; font-weight: bold; color: #ffd23f; margin-top: 4px;
+    letter-spacing: 0.5px; display: none; }
   #hud-tr { position: fixed; top: 18px; right: 18px; z-index: 5; text-align: right; }
   /* Bintang wanted TEBAL + outline gelap penuh — terbaca di langit oranye. */
   #stars { font-size: 32px; letter-spacing: 5px; font-weight: bold;
@@ -142,13 +145,14 @@
 <div id="hud-tl">
   <div id="objective" class="panel">
     <div id="obj-title">VELAMAR</div>
-    <div id="obj-text">Tekan M untuk misi berikutnya.</div>
+    <div id="obj-text">Press M for the next mission.</div>
     <div id="stage-row"><span id="stage-text">STAGE 1/1</span><div id="stage-bar"><div id="stage-fill"></div></div><span id="timer">0:00</span></div>
     <div id="next-line"></div>
     <div id="distance"></div>
   </div>
   <div id="police-panel" class="panel">
-    <div class="pu-head">🚨 POLISI VELAMAR</div>
+    <div class="pu-head">🚨 VELA POLICE</div>
+    <div id="police-summary"></div>
     <div id="police-rows"></div>
   </div>
 </div>
@@ -157,13 +161,13 @@
   <div id="stars"><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span><span class="star-off">☆</span></div>
   <div id="wanted-label">WANTED LEVEL</div>
   <div id="money">$50</div>
-  <div id="weapon-line">✊ TANGAN KOSONG</div>
+  <div id="weapon-line">✊ FISTS</div>
   <div id="weapon-slots"></div>
   <div id="clock">DAY 1 18:24</div>
 </div>
 
 <div id="controls" class="panel">
-  <b>WASD</b> jalan &nbsp; <b>E</b> mobil &nbsp; <b>F</b> pukul &nbsp; <b>M</b> misi &nbsp; <b>B</b> beli &nbsp; <b>P</b> jeda
+  <b>WASD</b> move &nbsp; <b>E</b> car &nbsp; <b>F</b> punch &nbsp; <b>1–4</b> weapons &nbsp; <b>R</b> radio &nbsp; <b>M</b> mission &nbsp; <b>B</b> buy &nbsp; <b>P</b> pause
 </div>
 
 <div id="message"></div>
@@ -174,7 +178,7 @@
   <div id="minimap-circle"><canvas id="minimap" width="150" height="150"></canvas></div>
   <div id="district">📍 VELAMAR</div>
   <div id="vitals">
-    <div class="v-label">KESEHATAN <span id="health-num">100</span></div>
+    <div class="v-label">HEALTH <span id="health-num">100</span></div>
     <div id="health-bar"><div id="health-fill"></div></div>
     <div class="v-label">ARMOUR <span id="armour-num">50</span></div>
     <div id="armour-bar"><div id="armour-fill"></div></div>
@@ -188,21 +192,21 @@
   <div id="dialogue-text"></div>
 </div>
 
-<div id="speed"><span id="speed-num">0</span> <span id="speed-unit">km/jam</span><div id="car-name"></div><div id="condition-row"><span id="condition-label">KONDISI</span><div id="condition-bar"><div id="condition-fill"></div></div><span id="condition-num">100%</span></div><div id="radio"></div></div>
+<div id="speed"><span id="speed-num">0</span> <span id="speed-unit">km/h</span><div id="car-name"></div><div id="condition-row"><span id="condition-label">CONDITION</span><div id="condition-bar"><div id="condition-fill"></div></div><span id="condition-num">100%</span></div><div id="radio"></div></div>
 
 <div id="shop" class="panel">
-  <div id="shop-title">TOKO</div>
-  <div id="shop-money">Uangmu: $0</div>
+  <div id="shop-title">SHOP</div>
+  <div id="shop-money">Your money: $0</div>
   <div id="shop-items"></div>
-  <div id="shop-hint">Tekan 1/2/3 atau klik untuk beli • B / Esc untuk tutup</div>
+  <div id="shop-hint">Press 1–5 or click to buy • B / Esc to close</div>
 </div>
 
 <div id="screen">
   <div id="screen-box">
     <div id="screen-title">VELAMAR</div>
-    <div id="screen-sub">KOTA PELABUHAN MATAHARI • 8 MISI • 3 HARI</div>
+    <div id="screen-sub">SUNNY HARBOR CITY • 8 MISSIONS • 3 DAYS</div>
     <div id="screen-text"></div>
-    <button id="screen-btn">MULAI MAIN</button>
+    <button id="screen-btn">START GAME</button>
     <div id="screen-foot"></div>
   </div>
 </div>

@@ -1,28 +1,28 @@
-// Police chase — mobil patroli + polisi jalan kaki + helikopter.
-// Wanted 0–5 bintang: naik saat kejahatan, memudar saat pemain bersembunyi.
-// Helikopter muncul di gameplay live saat wanted >= 4, mengorbit di atas pemain.
-// Aturan jumlah unit & peluruhan tinggal di wanted-level.js (fungsi murni).
+// Police chase — patrol cars + foot cops + helicopter.
+// Wanted 0–5 stars: rises on crime, fades when the player hides.
+// The helicopter appears in live play at wanted >= 4, orbiting above the
+// player with a volumetric searchlight cone.
+// Unit counts & decay live in wanted-level.js (pure functions).
 import * as THREE from 'three';
 import { GAME, WORLD } from './config.js';
 import { clamp, angleTo, makeRng } from './random.js';
 import { Car } from './vehicles.js';
+import { makeHuman, walkPose } from './human.js';
 import {
   policeCarCount, policeFootCount, helicopterWanted, decayWanted,
 } from './wanted-level.js';
 
-export const POLICE_MODEL = { id: 'police', name: 'Patroli Vela', color: 0x111111, speed: 40, accel: 20, price: 0 };
+export const POLICE_MODEL = { id: 'police', name: 'Vela Patrol', color: 0x111111, speed: 40, accel: 20, price: 0 };
 
 function makeFootCop() {
-  const m = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 4, 8),
-    new THREE.MeshLambertMaterial({ color: 0x1b263b }));
-  body.position.y = 1.0; m.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8),
-    new THREE.MeshLambertMaterial({ color: 0xf1c27d }));
-  head.position.y = 2.05; m.add(head);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.14, 10),
-    new THREE.MeshLambertMaterial({ color: 0x0d1b2a }));
-  cap.position.y = 2.3; m.add(cap);
+  const m = makeHuman({
+    skin: 0xf1c27d,
+    jacket: 0x1b263b,
+    pants: 0x0d1b2a,
+    hair: 0x111111,
+    cap: true,
+    capColor: 0x0d1b2a,
+  });
   return m;
 }
 
@@ -47,32 +47,47 @@ function makeHelicopter() {
     blade.rotation.y = a; rotor.add(blade);
   }
   rotor.position.y = 1.6; g.add(rotor);
-  // sorot lampu ke bawah
-  const beam = new THREE.Mesh(
-    new THREE.ConeGeometry(10, 55, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: 0.14, side: THREE.DoubleSide }),
-  );
+  // VOLUMETRIC SEARCHLIGHT CONE — bright warm-white cone from the belly to
+  // the street, plus a glowing pool where it hits the ground. This is the
+  // champion look (Top 3): the cone makes the helicopter unmissable.
+  const coneMat = new THREE.MeshBasicMaterial({
+    color: 0xfff2c9, transparent: true, opacity: 0.30,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(13, 55, 16, 1, true), coneMat);
   beam.position.y = -28; g.add(beam);
-  // strobo merah-biru di perut heli
+  const innerMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.22,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const inner = new THREE.Mesh(new THREE.ConeGeometry(6, 55, 12, 1, true), innerMat);
+  inner.position.y = -28; g.add(inner);
+  const pool = new THREE.Mesh(
+    new THREE.CircleGeometry(11, 20),
+    new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+  );
+  pool.rotation.x = -Math.PI / 2; pool.position.y = -54.5; g.add(pool);
+  // red-blue strobe on the belly
   const strobe = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 1.4),
     new THREE.MeshBasicMaterial({ color: 0xff0000 }));
   strobe.position.y = -1.2; g.add(strobe);
   g.userData.rotor = rotor;
   g.userData.strobe = strobe;
+  g.userData.beam = beam;
   return g;
 }
 
 export class PoliceChase {
   constructor(scene) {
     this.scene = scene;
-    // RNG sendiri (seeded) untuk posisi spawn polisi — Math.random() membuat
-    // screenshot tidak deterministik: tiap run, polisi muncul di sudut berbeda.
+    // Own seeded RNG for police spawn positions — Math.random() would make
+    // screenshots non-deterministic: each run, police would spawn elsewhere.
     this.rng = makeRng(WORLD.seed + 55);
     this.cars = [];
-    this.foot = []; // polisi jalan kaki {mesh, speed}
-    this.heli = null; // helikopter {mesh, angle}
+    this.foot = []; // foot cops {mesh, speed, animT}
+    this.heli = null; // helicopter {mesh, angle}
     this.wanted = 0;
-    this.heat = 0; // 0..1, memudar saat tidak ada kejahatan
+    this.heat = 0; // 0..1, fades when no crime happens
     this.bustedTimer = 0;
     this.flashT = 0;
   }
@@ -101,7 +116,7 @@ export class PoliceChase {
       const a = this.rng() * Math.PI * 2;
       m.position.set(playerPos.x + Math.sin(a) * 20, 0, playerPos.z + Math.cos(a) * 20);
       this.scene.add(m);
-      this.foot.push({ mesh: m, speed: 4.2 });
+      this.foot.push({ mesh: m, speed: 4.2, animT: this.rng() * 10 });
     }
   }
 
@@ -118,17 +133,17 @@ export class PoliceChase {
     }
   }
 
-  // Posisikan helikopter secara eksplisit (untuk screenshot staging) —
-  // mengesampingkan orbit live supaya heli UTUH di dalam frame.
+  // Position the helicopter explicitly (for screenshot staging) —
+  // overrides the live orbit so the heli sits WHOLE inside the frame.
   placeHelicopter(x, y, z, rotY) {
     if (!this.heli) return;
     this.heli.mesh.position.set(x, y, z);
     this.heli.mesh.rotation.y = rotY;
   }
 
-  // Daftar unit polisi untuk panel HUD: [{ name, dist, tactic }].
-  // Helikopter FARO-1 (SEARCHLIGHT) selalu duluan, lalu mobil patroli
-  // dengan nama + jarak meter + taktik dari jaraknya.
+  // Police units for the HUD panel: [{ name, dist, tactic }].
+  // Helicopter FARO-1 (SEARCHLIGHT) always first, then patrol cars with
+  // a name + distance in meters + a tactic from their distance.
   units(playerPos) {
     const rows = [];
     const names = ['VELA-11', 'AZUL-25', 'MARLIN-18', 'FARO-2', 'CORAL-7'];
@@ -138,7 +153,7 @@ export class PoliceChase {
     }
     this.cars.forEach((pc, i) => {
       const d = Math.hypot(pc.pos.x - playerPos.x, pc.pos.z - playerPos.z);
-      const tactic = d < 22 ? 'RAMMING' : d < 40 ? 'BOXING IN' : 'PURSUIT';
+      const tactic = d < 22 ? 'RAMMING' : d < 40 ? 'BOXING IN' : d > 90 ? 'ROADBLOCK' : 'PURSUIT';
       rows.push({ name: names[i % names.length], dist: Math.round(d), tactic });
     });
     return rows;
@@ -151,18 +166,18 @@ export class PoliceChase {
 
   update(dt, player) {
     this.flashT += dt;
-    // wanted memudar kalau pemain tidak berbuat jahat
+    // wanted fades if the player stops committing crimes
     const decayed = decayWanted(this.wanted, this.heat, dt);
     this.wanted = decayed.wanted;
     this.heat = decayed.heat;
     this.ensureUnits(player.pos);
     this.ensureHelicopter(player.pos);
-    // kurangi unit kalau wanted turun
+    // drop units if wanted falls
     while (this.cars.length > policeCarCount(this.wanted)) this.removeUnit(this.cars, this.cars.length - 1);
     while (this.foot.length > policeFootCount(this.wanted)) this.removeUnit(this.foot, this.foot.length - 1);
 
     const px = player.pos.x, pz = player.pos.z;
-    // mobil polisi: kejar pemain, tabrak kalau dekat
+    // police cars: chase the player, ram when close
     for (const pc of this.cars) {
       const dx = px - pc.pos.x, dz = pz - pc.pos.z;
       const d = Math.hypot(dx, dz);
@@ -173,29 +188,29 @@ export class PoliceChase {
       const steer = clamp(dh * 2, -1, 1);
       const throttle = d > 6 ? 1 : 0.4;
       pc.drive(throttle, steer, dt, 1 + this.wanted * 0.06);
-      // lampu strobo
+      // strobe lights
       const bar = pc.mesh.userData.lightBar;
       if (bar) {
         const on = Math.floor(this.flashT * 6) % 2 === 0;
         bar.red.material.color.setHex(on ? 0xff0000 : 0x550000);
         bar.blue.material.color.setHex(on ? 0x2244ff : 0x000055);
       }
-      // tabrakan dengan mobil pemain
+      // ram the player's car
       if (d < 4.5 && player.inCar) {
-        player.damage(6 * dt * 10, 'ditabrak polisi');
+        player.damage(6 * dt * 10, 'rammed by police');
         if (player.car) player.car.condition = Math.max(40, player.car.condition - 0.4);
         pc.speed *= 0.5;
-        // dorong mobil pemain
+        // shove the player's car
         player.car.pos.x += (dx / (d || 1)) * -2 * dt * 10;
         player.car.pos.z += (dz / (d || 1)) * -2 * dt * 10;
       }
-      // polisi terlalu jauh -> teleport mendekat (tetap dalam jarak kejar)
+      // police too far away -> teleport closer (stay in chase range)
       if (d > 180) {
         const a = this.rng() * Math.PI * 2;
         pc.pos.x = px + Math.sin(a) * 60; pc.pos.z = pz + Math.cos(a) * 60;
       }
     }
-    // helikopter: mengorbit di atas pemain, rotor berputar, strobo berkedip
+    // helicopter: orbits above the player, rotor spins, strobe blinks
     if (this.heli) {
       const h = this.heli;
       h.angle += dt * 0.35;
@@ -205,7 +220,7 @@ export class PoliceChase {
       const on = Math.floor(this.flashT * 4) % 2 === 0;
       h.mesh.userData.strobe.material.color.setHex(on ? 0xff0000 : 0x2244ff);
     }
-    // polisi jalan kaki: kejar & tangkap kalau pemain jalan kaki
+    // foot cops: chase & catch the player on foot
     let touching = false;
     for (const f of this.foot) {
       const p = f.mesh.position;
@@ -214,6 +229,8 @@ export class PoliceChase {
       if (!player.inCar && d > 1.2) {
         p.x += (dx / d) * f.speed * dt; p.z += (dz / d) * f.speed * dt;
         f.mesh.rotation.y = Math.atan2(dx, dz);
+        f.animT += dt;
+        walkPose(f.mesh, f.animT, 1.4);
       }
       if (!player.inCar && d < 1.6) touching = true;
     }

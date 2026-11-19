@@ -101,20 +101,23 @@ di-vendor lokal di `game/vendor/three.module.min.js`, tanpa network request.
 | `game/src/traffic.js` | Mobil lalu lintas AI + pejalan kaki berdetail |
 | `game/src/police-chase.js` | Polisi + wanted level 0–5 + helikopter |
 | `game/src/wanted-level.js` | Aturan wanted murni (jumlah unit, label, armour) |
-| `game/src/mission-delivery.js` | Rantai 8 misi (termasuk heist) + dialog + aktivitas sampingan |
+| `game/src/story-campaign.js` | Rantai 8 misi (termasuk heist) + dialog + aktivitas sampingan |
+| `game/src/textures.js` | Tekstur prosedural (aspal, fasad Art Deco, neon, kontainer, pasir, laut, matahari, awan) |
+| `game/src/human.js` | Karakter manusia 3D berartikulasi (jalan, aim, idle, senjata) |
 | `game/src/combat.js` | Pukul, pistol, musuh dermaga |
 | `game/src/hud.js` | HUD + menu beli + layar start/pause/misi |
 | `game/src/minimap.js` | Minimap canvas live |
 | `game/src/input.js` | Keyboard + mouse |
 | `game/src/audio.js` | Suara sintetis WebAudio |
 | `game/src/save.js` | Save/load localStorage (termasuk upgrade garasi) |
-| `game/src/screenshot-staging.js` | Mode screenshot top-down deterministik (`?shot=...`) |
+| `game/src/screenshot-staging.js` | Mode screenshot chase-camera deterministik (`?shot=...`) |
 | `game/src/random.js` | RNG deterministik (seeded) |
 
 ## Screenshot
 
 Empat screenshot deterministik diambil dari game yang benar-benar jalan
-(`shots.json`), semuanya kamera atas (top-down): kejar-kejaran polisi di
-jalan pantai dengan mercusuar Faro Vela, kabur dari Bank Vela (heist) di
-persimpangan, jalan kaki di depan Toko Senjata dengan menu beli terbuka,
-dan layar misi selesai di atas jalan ramai.
+(`shots.json`), semuanya kamera chase 3D street-level: kejar-kejaran golden-hour
+di boulevard pantai dengan Cometa GT + helikopter + mercusuar Faro Vela,
+kabur heist malam dari Bank Vela dengan sorot searchlight helikopter,
+tembak-menembak jalan kaki di Dermaga Puerto Vela (kontainer + crane + kapal),
+dan siang cerah di Plaza Mercado dengan banner "MISSION PASSED! +$5,000".

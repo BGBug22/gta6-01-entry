@@ -1,6 +1,8 @@
-// HUD — semua elemen layar: health, armour, respect, wanted stars, uang,
-// senjata, objektif misi + jarak + timer, jam kota, dialog, distrik, radio,
-// kecepatan + nama mobil, pesan tengah, prompt tombol, layar start / pause / misi.
+// HUD — all screen elements: health, armour, respect, wanted stars, money,
+// weapons, mission objective + distance + timer, city clock, dialog, district,
+// radio, speed + car name, center message, key prompt, start / pause / mission
+// screens. v5: a POLICE UNITS summary line ("4 UNITS · 12m RAMMING ·
+// 28m SPOTLIGHT · 95m ROADBLOCK") shown while wanted >= 1.
 import { wantedLabel } from './wanted-level.js';
 
 export class Hud {
@@ -10,7 +12,7 @@ export class Hud {
       'money', 'weapon-line', 'respect-line', 'respect-fill',
       'stars', 'wanted-label', 'clock', 'district',
       'objective', 'obj-title', 'obj-text', 'distance', 'timer', 'dialogue',
-      'dialogue-text', 'dialogue-portrait', 'police-rows',
+      'dialogue-text', 'dialogue-portrait', 'police-rows', 'police-summary',
       'stage-fill', 'stage-text', 'next-line',
       'condition-fill', 'condition-num',
       'speed', 'speed-num', 'speed-unit', 'car-name', 'radio',
@@ -20,7 +22,7 @@ export class Hud {
       this.el[id] = document.getElementById(id);
     }
     this.messageTimer = 0;
-    this.onShopBuy = null; // (index) => dipanggil saat item toko diklik / tombol 1-3
+    this.onShopBuy = null; // (index) => called when a shop item is clicked / key 1-5
   }
   setHealth(h) {
     this.el['health-fill'].style.width = `${Math.max(0, h)}%`;
@@ -33,8 +35,8 @@ export class Hud {
   }
   setMoney(m) { this.el.money.textContent = `$${m.toLocaleString('en-US')}`; }
   setWanted(n) {
-    // Bintang TEBAL: span terisi (emas, merah saat wanted >= 3) + kosong (pudar),
-    // outline gelap penuh dari CSS #stars — terbaca di langit oranye.
+    // THICK stars: filled spans (gold, red at wanted >= 3) + empty (faded),
+    // full dark outline from CSS #stars — readable against the orange sky.
     let s = '';
     for (let i = 0; i < 5; i++) s += i < n ? '<span class="star-on">★</span>' : '<span class="star-off">☆</span>';
     this.el.stars.innerHTML = s;
@@ -46,8 +48,8 @@ export class Hud {
     this.el['respect-fill'].style.width = `${(level / 5) * 100}%`;
   }
   setWeapon(text) { this.el['weapon-line'].textContent = text; }
-  // Bar slot senjata 4 buah (ala juara): [{icon, name, ammo, active, locked, key}]
-  // ammo = teks di bawah nama ('24/120', '∞', atau '🔒'); locked = slot terkunci.
+  // 4 weapon slots (champion style): [{icon, name, ammo, active, locked, key}]
+  // ammo = text under the name ('24/120', '∞', or '🔒'); locked = slot locked.
   setWeaponSlots(slots) {
     const box = this.el['weapon-slots'];
     if (!slots || !slots.length) { box.className = ''; box.innerHTML = ''; return; }
@@ -74,15 +76,15 @@ export class Hud {
   }
   setObjective(title, text) {
     this.el['obj-title'].textContent = title || 'VELAMAR';
-    this.el['obj-text'].textContent = text || 'Tekan M untuk misi berikutnya.';
+    this.el['obj-text'].textContent = text || 'Press M for the next mission.';
   }
-  // Progres misi di kartu misi: "STAGE 2/2" + bar + "NEXT ▸ ...".
+  // Mission progress on the mission card: "STAGE 2/2" + bar + "NEXT ▸ ...".
   setStage(stage, total, next) {
     this.el['stage-text'].textContent = `STAGE ${stage}/${total}`;
     this.el['stage-fill'].style.width = `${Math.max(0, Math.min(100, (stage / total) * 100))}%`;
     this.el['next-line'].textContent = next ? `NEXT ▸ ${next}` : '';
   }
-  // Daftar unit polisi: [{ name, dist, tactic }] — baris nama + jarak + taktik.
+  // Police unit list: [{ name, dist, tactic }] — name + distance + tactic rows.
   setPolice(rows) {
     const box = this.el['police-rows'];
     box.innerHTML = '';
@@ -101,8 +103,19 @@ export class Hud {
       row.appendChild(nm); row.appendChild(ds); row.appendChild(tc);
       box.appendChild(row);
     }
+    this.setPoliceSummary(rows);
   }
-  // Kondisi mobil 0–100 di blok kecepatan.
+  // One-line police summary (champion style):
+  // "4 UNITS · 12m RAMMING · 28m SPOTLIGHT · 95m ROADBLOCK".
+  setPoliceSummary(rows) {
+    const el = this.el['police-summary'];
+    if (!el) return;
+    if (!rows || !rows.length) { el.textContent = ''; el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.textContent = `${rows.length} UNIT${rows.length > 1 ? 'S' : ''} · ` +
+      rows.map((r) => `${r.dist}m ${r.tactic}`).join(' · ');
+  }
+  // Car condition 0–100 in the speed block.
   setCondition(pct) {
     const p = Math.max(0, Math.min(100, Math.round(pct)));
     this.el['condition-fill'].style.width = `${p}%`;
@@ -112,7 +125,7 @@ export class Hud {
   setDistance(m) {
     if (m === null || m === undefined) { this.el.distance.style.display = 'none'; return; }
     this.el.distance.style.display = 'block';
-    this.el.distance.textContent = `📍 ${Math.round(m)}m ke tujuan`;
+    this.el.distance.textContent = `📍 ${Math.round(m)}m to target`;
   }
   setTimer(sec) {
     if (sec > 0) {
@@ -130,29 +143,29 @@ export class Hud {
     this.el['dialogue-text'].innerHTML = `<b>${giver}</b>: ${line}`;
     this.drawPortrait(giver);
   }
-  // Potret karakter (canvas 2D, deterministik): MARA berkacamata, RICO bertopi merah.
+  // Character portrait (2D canvas, deterministic): MARA with glasses, RICO with a red cap.
   drawPortrait(giver) {
     const c = this.el['dialogue-portrait'];
     if (!c) return;
     const g = c.getContext('2d');
     g.clearRect(0, 0, 64, 64);
     g.fillStyle = '#12233d'; g.fillRect(0, 0, 64, 64);
-    // wajah
+    // face
     g.fillStyle = '#f1c27d';
     g.beginPath(); g.arc(32, 34, 20, 0, Math.PI * 2); g.fill();
     if (giver === 'MARA') {
-      // rambut bob gelap
+      // dark bob hair
       g.fillStyle = '#2b2b3a';
       g.beginPath(); g.arc(32, 28, 21, Math.PI, 0); g.fill();
       g.fillRect(11, 26, 8, 18); g.fillRect(45, 26, 8, 18);
-      // kacamata
+      // glasses
       g.strokeStyle = '#12233d'; g.lineWidth = 2.5;
       g.beginPath(); g.arc(24, 34, 6, 0, Math.PI * 2); g.stroke();
       g.beginPath(); g.arc(40, 34, 6, 0, Math.PI * 2); g.stroke();
       g.beginPath(); g.moveTo(30, 34); g.lineTo(34, 34); g.stroke();
       g.fillStyle = '#ffd23f'; g.fillRect(12, 56, 40, 8);
     } else {
-      // topi merah RICO
+      // RICO's red cap
       g.fillStyle = '#e63946';
       g.beginPath(); g.arc(32, 26, 20, Math.PI, 0); g.fill();
       g.fillRect(10, 24, 44, 5);
@@ -161,7 +174,7 @@ export class Hud {
       g.beginPath(); g.arc(39, 35, 2.2, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#2a9d8f'; g.fillRect(12, 56, 40, 8);
     }
-    // senyum
+    // smile
     g.strokeStyle = '#7a3b2e'; g.lineWidth = 2;
     g.beginPath(); g.arc(32, 44, 6, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
   }
@@ -185,10 +198,10 @@ export class Hud {
     else this.el.prompt.style.display = 'none';
   }
   setCrosshair(on) { this.el.crosshair.style.display = on ? 'block' : 'none'; }
-  // Menu beli — panel toko / garasi. items: [{name, price, note, disabled}].
+  // Buy menu — shop / garage panel. items: [{name, price, note, disabled}].
   showShop(title, items, money, onBuy) {
     this.el['shop-title'].textContent = title;
-    this.el['shop-money'].textContent = `Uangmu: $${money.toLocaleString('en-US')}`;
+    this.el['shop-money'].textContent = `Your money: $${money.toLocaleString('en-US')}`;
     this.onShopBuy = onBuy;
     const box = this.el['shop-items'];
     box.innerHTML = '';
@@ -207,7 +220,7 @@ export class Hud {
     });
     this.el.shop.style.display = 'block';
   }
-  setShopMoney(m) { this.el['shop-money'].textContent = `Uangmu: $${m.toLocaleString('en-US')}`; }
+  setShopMoney(m) { this.el['shop-money'].textContent = `Your money: $${m.toLocaleString('en-US')}`; }
   hideShop() { this.el.shop.style.display = 'none'; this.onShopBuy = null; }
   shopVisible() { return this.el.shop.style.display === 'block'; }
   update(dt) {
@@ -216,7 +229,7 @@ export class Hud {
       if (this.messageTimer <= 0) this.el.message.style.opacity = '0';
     }
   }
-  // Layar penuh: start, pause, misi selesai/gagal, wasted/busted, menang total.
+  // Full screen: start, pause, mission complete/fail, wasted/busted, total win.
   showScreen(title, text, btnText, onBtn) {
     this.el['screen-title'].textContent = title;
     this.el['screen-text'].innerHTML = text;

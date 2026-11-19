@@ -1,82 +1,125 @@
-// Minimap — canvas 2D live: jalan grid, laut, mercusuar, pemain (panah kuning),
-// polisi (biru/merah), target misi (berlian kuning berkedip), mobil (abu-abu).
+// GTA radar minimap — dark blue sea, cream beach, dark grey city blocks,
+// light grey roads, gold GPS route to the mission target, player arrow,
+// red/blue police dots with direction cones, blinking target diamond, and a
+// red dashed search circle while the police are hunting.
 import { WORLD } from './config.js';
 
 export class Minimap {
   constructor(canvas) {
-    this.canvas = canvas;
+    this.c = canvas;
     this.ctx = canvas.getContext('2d');
-    this.size = canvas.width;
     this.t = 0;
   }
-  draw(state) {
-    const ctx = this.ctx, S = this.size;
-    const H = WORLD.halfSize + 60;
-    const toMap = (x, z) => [((x + H) / (2 * H)) * S, ((z + H) / (2 * H)) * S];
-    this.t += 0.016;
-    // latar: darat + laut — warna TERANG supaya terbaca di lingkaran kecil
-    ctx.fillStyle = '#8fb573'; ctx.fillRect(0, 0, S, S);
-    const [seaX] = toMap(WORLD.seaX - 160, 0);
-    ctx.fillStyle = '#2f9fd8'; ctx.fillRect(0, 0, Math.max(0, seaX), S);
-    // pantai pasir LEBAR + terang — garis pantai terbaca sekali lirik
-    ctx.fillStyle = '#ffe9b0';
-    const [bx] = toMap(WORLD.beachX, 0);
-    ctx.fillRect(Math.max(0, bx) - 5, 0, 8, S);
-    // jalan grid — PUTIH TEBAL supaya terbaca di lingkaran kecil
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+  draw(game) {
+    const ctx = this.ctx;
+    const S = this.c.width;
+    const cx = S / 2, cy = S / 2;
+    const scale = S / (WORLD.halfSize * 2 + 80);
+    const px = (x) => cx + (x - game.player.pos.x) * scale;
+    const py = (z) => cy + (z - game.player.pos.z) * scale;
+    this.t += 1 / 60;
+    // background: dark blue sea
+    ctx.clearRect(0, 0, S, S);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = '#0b3d66';
+    ctx.fillRect(0, 0, S, S);
+    // beach strip (cream)
+    ctx.fillStyle = '#f2d8a0';
+    const bx0 = px(WORLD.beachX - 37), bx1 = px(WORLD.beachX + 13);
+    ctx.fillRect(bx0, 0, bx1 - bx0, S);
+    // city blocks (dark grey)
+    ctx.fillStyle = '#2b2f38';
+    ctx.fillRect(px(WORLD.beachX + 13), 0, S - px(WORLD.beachX + 13), S);
+    // roads (light grey)
+    ctx.strokeStyle = '#c9cdd6';
+    ctx.lineWidth = 4;
     for (let i = -4; i <= 4; i++) {
-      const [x1, y1] = toMap(i * WORLD.roadGap, -H);
-      const [x2, y2] = toMap(i * WORLD.roadGap, H);
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      const [x3, y3] = toMap(-H, i * WORLD.roadGap);
-      const [x4, y4] = toMap(H, i * WORLD.roadGap);
-      ctx.beginPath(); ctx.moveTo(x3, y3); ctx.lineTo(x4, y4); ctx.stroke();
+      const r = i * WORLD.roadGap;
+      ctx.beginPath(); ctx.moveTo(0, py(r)); ctx.lineTo(S, py(r)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px(r), 0); ctx.lineTo(px(r), S); ctx.stroke();
     }
-    // dermaga + mercusuar
-    const [lx, ly] = toMap(-292, -252);
+    // GPS route: gold dashed line from the player to the mission target
+    const target = game.missionTarget();
+    if (target) {
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      // L-shaped route: along the road grid, not a straight diagonal
+      ctx.lineTo(px(target.x), py(game.player.pos.z));
+      ctx.lineTo(px(target.x), py(target.z));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // target diamond (blinking gold)
+      const blink = 0.6 + 0.4 * Math.sin(this.t * 4);
+      ctx.save();
+      ctx.translate(px(target.x), py(target.z));
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = `rgba(255,210,63,${blink})`;
+      ctx.fillRect(-5, -5, 10, 10);
+      ctx.restore();
+    }
+    // pier (brown line) + lighthouse (red dot)
+    ctx.strokeStyle = '#8a6b3d';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(px(-292), py(-130)); ctx.lineTo(px(-292), py(-250)); ctx.stroke();
     ctx.fillStyle = '#e63946';
-    ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Arial';
-    ctx.fillText('FARO', lx + 7, ly + 3);
-    // target misi (berkedip)
-    if (state.target) {
-      const [tx, ty] = toMap(state.target.x, state.target.z);
-      const r = 6 + Math.sin(this.t * 6) * 2;
-      ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.arc(px(-292), py(-252), 3, 0, Math.PI * 2); ctx.fill();
+    // traffic (grey dots) + pedestrians (pale dots)
+    ctx.fillStyle = '#9aa0ab';
+    for (const t of game.traffic) { ctx.fillRect(px(t.car.pos.x) - 1, py(t.car.pos.z) - 1, 2, 2); }
+    ctx.fillStyle = '#e8e8e8';
+    for (const p of game.peds) { ctx.fillRect(px(p.mesh.position.x) - 1, py(p.mesh.position.z) - 1, 2, 2); }
+    // police: red dots + direction cones (cars), blue dots (foot cops)
+    for (const pc of game.police.cars) {
+      ctx.fillStyle = '#ff2222';
+      ctx.beginPath(); ctx.arc(px(pc.pos.x), py(pc.pos.z), 4, 0, Math.PI * 2); ctx.fill();
+      // direction cone (facing the player)
+      const a = Math.atan2(game.player.pos.x - pc.pos.x, game.player.pos.z - pc.pos.z);
+      ctx.fillStyle = 'rgba(255,34,34,0.35)';
       ctx.beginPath();
-      ctx.moveTo(tx, ty - r); ctx.lineTo(tx + r, ty); ctx.lineTo(tx, ty + r); ctx.lineTo(tx - r, ty);
+      ctx.moveTo(px(pc.pos.x), py(pc.pos.z));
+      ctx.arc(px(pc.pos.x), py(pc.pos.z), 10, Math.PI / 2 - a - 0.4, Math.PI / 2 - a + 0.4);
       ctx.closePath(); ctx.fill();
     }
-    // mobil lalu lintas
-    ctx.fillStyle = '#c8c8c8';
-    for (const c of state.cars || []) {
-      const [cx, cy] = toMap(c.x, c.z);
-      ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+    ctx.fillStyle = '#3355ff';
+    for (const f of game.police.foot) {
+      ctx.beginPath(); ctx.arc(px(f.mesh.position.x), py(f.mesh.position.z), 3, 0, Math.PI * 2); ctx.fill();
     }
-    // polisi
-    for (const c of state.police || []) {
-      const [cx, cy] = toMap(c.x, c.z);
-      ctx.fillStyle = '#2244ff';
-      ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2); ctx.fill();
+    // helicopter: cyan ring + searchlight pool
+    if (game.police.heli) {
+      const h = game.police.heli.mesh.position;
+      ctx.strokeStyle = '#4cc9f0';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px(h.x), py(h.z), 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,242,201,0.35)';
+      ctx.beginPath(); ctx.arc(px(h.x), py(h.z), 12, 0, Math.PI * 2); ctx.fill();
     }
-    // pemain: panah kuning BESAR searah hadap
-    const [px, py] = toMap(state.player.x, state.player.z);
-    // zona pencarian merah (ala juara) saat polisi mengejar
-    if (state.police && state.police.length > 0) {
-      ctx.strokeStyle = '#ff5d5d'; ctx.lineWidth = 2.5;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath(); ctx.arc(px, py, 30, 0, Math.PI * 2); ctx.stroke();
+    // player arrow (white, pointing along the heading — the car's heading while driving)
+    const heading = game.player.inCar && game.player.car ? game.player.car.heading : game.player.heading;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(heading);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -8); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    // search circle (red dashed) while the police are hunting
+    if (game.police.wanted > 0) {
+      ctx.strokeStyle = 'rgba(255,34,34,0.8)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(Math.atan2(Math.sin(state.player.heading), Math.cos(state.player.heading)) * -1 + Math.PI);
-    ctx.fillStyle = '#ffd23f';
-    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 7); ctx.lineTo(-6.5, 7); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#12233d'; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.restore();
-    // bingkai LINGKARAN (minimap kini bundar)
-    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2); ctx.stroke();
+    // gold circular frame
+    ctx.strokeStyle = '#ffd23f';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); ctx.stroke();
   }
 }

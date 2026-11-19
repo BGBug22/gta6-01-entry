@@ -8,7 +8,7 @@ export function policeCarCount(wanted) {
   if (wanted <= 0) return 0;
   if (wanted <= 1) return 1;
   if (wanted <= 3) return 2;
-  return 3;
+  return 4;
 }
 
 // Foot cop count for a given wanted level.

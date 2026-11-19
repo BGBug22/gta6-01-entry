@@ -1,8 +1,7 @@
-// VELAMAR — open-world crime game. Entry point: builds the world, the main
-// loop, player controls (on foot + driving), wanted/police + helicopter,
-// missions, combat, shops, saves, city clock, respect, and the chase camera
-// for screenshots. v5: ACES filmic tone mapping, an articulated 3D player,
-// 4 functional weapons, 3 radio stations, and 100% English UI.
+// VELAMAR — open-world crime game. Entry: world, main loop, controls,
+// wanted/police + heli, missions, combat, shops, saves, clock, respect,
+// chase camera. v5: ACES tone mapping, articulated player, 4 weapons,
+// 3 radio stations, 100% English UI.
 import * as THREE from 'three';
 import { WORLD, DISTRICTS, CAR_MODELS, SHOPS, MISSIONS, GAME, DENSITY, CLOCK, ARMOUR, RADIO, SHOP_PRICES, SHOP_LIMITS, WEAPONS } from './config.js';
 import { makeRng, pick, range, clamp, dist2 } from './random.js';

@@ -80,10 +80,10 @@ export function stageShot(game, shot) {
     police.wanted = 4; police.heat = 1;
     police.ensureUnits(g.player.pos);
     police.cars.forEach((pc, i) => {
-      // 22-38 m away, SPREAD ACROSS the road (not single file): the police
+      // 22-38 m ahead, SPREAD ACROSS the road (not single file): the police
       // close in during staging but never reach the player's (now
       // stationary) car, and they stay visible on both sides of the hero.
-      const spots = [[-232, -192], [-248, -200], [-238, -208]];
+      const spots = [[-232, -192], [-248, -200], [-238, -208], [-228, -186]];
       setCarAt(pc, spots[i][0], spots[i][1], Math.PI, 34 + i);
     });
     police.ensureHelicopter(g.player.pos);
@@ -103,11 +103,12 @@ export function stageShot(game, shot) {
     g.missions.index = 7; g.missions.state = 'active'; g.missions.timer = 132;
     g.missions.marker.visible = true;
     g.missions.marker.position.set(-292, 0, -198);
-    // Chase camera: yaw 1.15 to the west (sea fills the left half),
-    // pitch 0.12 + distance 11 so the big Cometa GT hero fills the
-    // foreground and the lighthouse + ferris wheel sit whole on the horizon
-    // (the downward view angle is only ~12°, the top frame edge is at +23°).
-    g.cameraYaw = 1.15; g.cameraPitch = 0.12; g.camDist = 11; g.cameraSide = 0; g.camLookSide = 0;
+    // Chase camera: yaw 0.65 (~37 deg west of north) so the view runs DOWN
+    // the beach boulevard (vanishing point ahead) with the sea + beach
+    // filling the left half and the Art Deco city on the right; pitch 0.03
+    // + dist 13 keeps the whole Faro Vela lighthouse in frame; camLookSide
+    // -3 shifts the aim west so the sea fills the left, hero sits right.
+    g.cameraYaw = 0.65; g.cameraPitch = 0.03; g.camDist = 13; g.cameraSide = 0; g.camLookSide = -3;
     g.money = 18450; // mission 8/8, DAY 3 — an endgame player must be rich (champions $12-48k)
     g.clockDay = 3; g.clockMin = 18 * 60 + 36;
     g.player.armour = 54;
@@ -128,9 +129,9 @@ export function stageShot(game, shot) {
     police.wanted = 4; police.heat = 1;
     police.ensureUnits(g.player.pos);
     police.cars.forEach((pc, i) => {
-      // two chasers behind, one roadblock ahead (facing the player)
-      const spots = [[156, -100], [164, -90], [160, -150]];
-      const headings = [Math.PI, Math.PI, 0];
+      // two chasers behind, one roadblock ahead (facing the player), one flank
+      const spots = [[156, -100], [164, -90], [160, -150], [150, -110]];
+      const headings = [Math.PI, Math.PI, 0, Math.PI];
       setCarAt(pc, spots[i][0], spots[i][1], headings[i], 28 + i);
     });
     police.ensureHelicopter(g.player.pos);
@@ -181,9 +182,11 @@ export function stageShot(game, shot) {
     g.missions.index = 6; g.missions.state = 'active';
     g.missions.marker.visible = true;
     g.missions.marker.position.set(-260, 0, -145);
-    // Camera behind the player on foot (heading + PI), close and low so the
-    // player + thugs + crane + cargo ship all fit in the frame.
-    g.cameraYaw = -1.75 + Math.PI; g.cameraPitch = 0.12; g.camDist = 8; g.cameraSide = 0; g.camLookSide = 0;
+    // Camera over-the-shoulder: 3/4 behind the player's RIGHT side (the
+    // player faces west, so right = north) — the dock crane mast, which
+    // stood dead-center, now sits off to the side and the thugs + ship +
+    // sea stay in frame.
+    g.cameraYaw = -1.75 + Math.PI + 0.5; g.cameraPitch = 0.12; g.camDist = 8; g.cameraSide = 0; g.camLookSide = 0;
     g.money = 870;
     g.clockDay = 2; g.clockMin = 16 * 60 + 40;
     g.player.armour = 62;
@@ -191,7 +194,7 @@ export function stageShot(game, shot) {
     g.combat.hasPistol = true; g.combat.ammo.pistol = 24; g.combat.weapon = 'pistol';
   } else if (shot === 'plaza-shop') {
     // PLAZA SHOP: bright afternoon at Plaza Mercado. The player on foot by
-    // the fountain, cars + palms + the market around, the KOTA TUA sign in
+    // the fountain, cars + palms + the market around, the OLD TOWN sign in
     // frame. A compact "MISSION PASSED! +$5,000" banner (the #message line,
     // not a dark modal) sits at the top — over 75% of the 3D city stays
     // fully visible.
@@ -204,6 +207,10 @@ export function stageShot(game, shot) {
       [40, 156, Math.PI / 2], [120, 164, -Math.PI / 2], [0, 160, Math.PI / 2], [160, 160, -Math.PI / 2],
     ];
     g.traffic.slice(0, 8).forEach((tc, i) => placeTrafficCar(tc, ...trafficSpots[i]));
+    // Two sports cars parked at the plaza's east edge (on the road, curb side).
+    const sport = CAR_MODELS.find((m) => m.id === 'sport');
+    g.playerCar(sport, 86, 130, Math.PI);
+    g.playerCar(sport, 86, 155, Math.PI);
     const pedSpots = [
       [52, 130], [68, 135], [56, 150], [64, 110], [72, 145], [48, 140],
       [60, 160], [76, 125], [44, 120], [70, 155], [52, 105], [66, 165],
@@ -235,13 +242,27 @@ export function stageShot(game, shot) {
       g.player.pos.x + fwd.x * 1.2, 1.4, g.player.pos.z + fwd.z * 1.2,
     );
     g.combat.staticFlash(muzzle, new THREE.Vector3(fwd.x, 0, fwd.z));
-    // tracer from the muzzle to the nearest thug
+    // tracer from the muzzle to the nearest thug — a glowing beam
+    // (a real 3D cylinder, visible at screenshot resolution) + an impact
+    // burst where the round hits the thug.
     const thug = g.enemies[0];
     if (thug) {
       const end = new THREE.Vector3(thug.pos.x, 1.2, thug.pos.z);
-      const geo = new THREE.BufferGeometry().setFromPoints([muzzle, end]);
-      const tracer = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe66d }));
-      g.scene.add(tracer);
+      const dir = end.clone().sub(muzzle);
+      const len = dir.length();
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.06, len, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffe66d, transparent: true, opacity: 0.85 }),
+      );
+      beam.position.copy(muzzle).add(end).multiplyScalar(0.5);
+      beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      g.scene.add(beam);
+      const hit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.35, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffd23f }),
+      );
+      hit.position.copy(end);
+      g.scene.add(hit);
     }
   }
   // Final HUD AFTER staging — stepWorld overwrites the objective text every frame.
@@ -271,7 +292,7 @@ export function stageShot(game, shot) {
   const missionId = { cover: 8, 'heist-night': 6, 'combat-dock': 7, 'plaza-shop': 2 }[shot];
   const dlg = DIALOGS[missionId];
   if (dlg) g.hud.setDialog(dlg.giver, dlg.line);
-  const district = { cover: 'PUERTO VELA', 'heist-night': 'GLASS DISTRICT', 'combat-dock': 'PUERTO VELA', 'plaza-shop': 'KOTA TUA' }[shot];
+  const district = { cover: 'PUERTO VELA', 'heist-night': 'GLASS DISTRICT', 'combat-dock': 'PUERTO VELA', 'plaza-shop': 'OLD TOWN' }[shot];
   g.hud.setDistrict(district);
   const radio = {
     cover: '🎵 SOL FM 95.4 — SYNTHWAVE',

@@ -1,13 +1,6 @@
-// City of VELAMAR — builds all static meshes: roads, sidewalks, crosswalks,
-// buildings with lit window grids + warm tile roofs, beach, sea, pier,
-// Faro Vela lighthouse, district signs + ground decals, umbrellas & beach
-// towers. Returns { group, colliders } — colliders = building & wall AABBs.
-// v5: procedural textures (asphalt, Art Deco facades, glass towers, neon
-// signs, containers, sand, sea, sun, clouds), procedural clouds, sun with
-// halo bloom, sea sparkle + foam shoreline, curved palms with 7 layered
-// fronds, neon signs (VELA BANK, HOTEL AZUL, EL GATILLO ARMS), a dock
-// container yard + crane + cargo ship, streetlights, and a night mode
-// (buildCity(scene, { night: true })) for the heist shot.
+// City of VELAMAR — static meshes: roads, buildings, beach, sea, pier,
+// lighthouse, signs, palms, dock yard + crane + ship. Returns { group,
+// colliders }. v5: procedural textures + clouds + sun halo + night mode.
 import * as THREE from 'three';
 import { WORLD, DISTRICTS, PALETTE, ROOF_COLORS, SHOP_SIGNS } from './config.js';
 import { makeRng, pick, range } from './random.js';
@@ -151,11 +144,11 @@ export function buildCity(scene, opts = {}) {
   // Static positions (seeded) so screenshots stay deterministic.
   const cloudTex = cloudTexture();
   const cloudMat = new THREE.MeshBasicMaterial({
-    map: cloudTex, transparent: true, opacity: night ? 0.35 : 0.85,
+    map: cloudTex, transparent: true, opacity: night ? 0.35 : 0.95,
     side: THREE.DoubleSide, depthWrite: false, fog: false,
   });
   const cloudRng = makeRng(WORLD.seed + 101);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 16; i++) {
     const w = 120 + cloudRng() * 180;
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.42), cloudMat);
     cloud.position.set(
@@ -269,8 +262,8 @@ export function buildCity(scene, opts = {}) {
   group.add(foam);
 
   // --- Road grid + sidewalks + center dashes (grainy asphalt texture) ---
-  const roadTexH = asphaltTexture(); roadTexH.repeat.set(40, 1);
-  const roadTexV = asphaltTexture(); roadTexV.repeat.set(1, 40);
+  const roadTexH = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexH.repeat.set(40, 1);
+  const roadTexV = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexV.repeat.set(1, 40);
   const roadMatH = new THREE.MeshLambertMaterial({ map: roadTexH });
   const roadMatV = new THREE.MeshLambertMaterial({ map: roadTexV });
   const walkMat = new THREE.MeshLambertMaterial({ color: PALETTE.sidewalk });
@@ -321,7 +314,7 @@ export function buildCity(scene, opts = {}) {
   // Vertical decals (running down the road) REMOVED: from the low chase
   // camera they become giant color smears across the road.
   const decals = [
-    { text: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
+    { text: 'OLD TOWN', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
     { text: 'VELAMAR', sub: 'HARBOR CITY', x: -40, z: 0, vertical: false, color: '#ffd23f' },
   ];
   for (const d of decals) {
@@ -550,8 +543,8 @@ export function buildCity(scene, opts = {}) {
 
   // --- Puerto Vela Docks: container yard + crane + cargo ship ---
   const dockX = -252, dockZ = -140;
-  const contTex = containerTexture();
-  const contMat = new THREE.MeshLambertMaterial({ map: contTex });
+  const contCols = ['#c8342c', '#e07b2a', '#2a5fc8'];
+  const contMats = contCols.map((c, i) => new THREE.MeshLambertMaterial({ map: containerTexture(c, 20 + i) }));
   const contGeo = new THREE.BoxGeometry(12, 2.6, 2.6);
   const contSpots = [
     { x: -246, z: -120, y: 1.3, ry: 0 }, { x: -246, z: -120, y: 3.9, ry: 0 },
@@ -559,13 +552,13 @@ export function buildCity(scene, opts = {}) {
     { x: -258, z: -108, y: 3.9, ry: Math.PI / 2 }, { x: -258, z: -108, y: 6.5, ry: Math.PI / 2 },
     { x: -232, z: -150, y: 1.3, ry: 0.3 }, { x: -270, z: -160, y: 1.3, ry: -0.2 },
   ];
-  for (const s of contSpots) {
-    const c = new THREE.Mesh(contGeo, contMat);
+  contSpots.forEach((s, i) => {
+    const c = new THREE.Mesh(contGeo, contMats[i % 3]);
     c.position.set(s.x, s.y, s.z);
     c.rotation.y = s.ry;
     group.add(c);
     colliders.push({ minX: s.x - 6, maxX: s.x + 6, minZ: s.z - 2, maxZ: s.z + 2 });
-  }
+  });
   // dock crane: tower + jib + cable + hook
   const crane = new THREE.Group();
   const craneMat = new THREE.MeshLambertMaterial({ color: 0xffd23f });
@@ -581,9 +574,7 @@ export function buildCity(scene, opts = {}) {
   const hook = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4),
     new THREE.MeshLambertMaterial({ color: 0x333333 }));
   hook.position.set(20, 11, 0); crane.add(hook);
-  // West end of the dock, by the pier — clear of the beach-boulevard cover
-  // camera's line of sight (it used to stand at (-252,-180) and block the
-  // whole center of the cover frame).
+  // West end of the dock, by the pier — clear of the cover camera's view.
   crane.position.set(dockX - 16, 0, dockZ + 0);
   group.add(crane);
   // cargo ship moored at the dock
@@ -700,10 +691,11 @@ export function buildCity(scene, opts = {}) {
   }
 
   // --- Plaza Mercado: paved plaza + a fountain with a spout ---
-  // A light stone disc so the plaza reads as a paved square, not dirt.
+  // Grainy stone paving (sand texture tinted stone) + a cafe set so the
+  // plaza reads as a lively paved square, not a plain floor.
   const plaza = new THREE.Mesh(
     new THREE.CircleGeometry(34, 24),
-    new THREE.MeshLambertMaterial({ color: 0xd8cbb0 }),
+    new THREE.MeshLambertMaterial({ map: sandTexture(), color: 0xd8cbb0 }),
   );
   plaza.rotation.x = -Math.PI / 2;
   plaza.position.set(60, 0.06, 140);
@@ -733,6 +725,15 @@ export function buildCity(scene, opts = {}) {
   );
   spoutTop.position.set(60, 3.8, 140);
   group.add(spoutTop);
+  // Cafe set: 3 umbrellas + benches + 2 palms around the plaza edge.
+  for (const [ux, uz, uc] of [[38, 118, 0xe63946], [82, 162, 0xffd23f], [40, 162, 0x4cc9f0]]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }));
+    pole.position.set(ux, 1.5, uz); group.add(pole);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.2, 8), new THREE.MeshLambertMaterial({ color: uc }));
+    top.position.set(ux, 3.5, uz); group.add(top);
+    group.add(box(2.4, 0.5, 0.9, 0x8a6b3d, ux + 2, 0.25, uz + 2));
+  }
+  group.add(makePalm(34, 120, 8, 0.02), makePalm(86, 118, 7, -0.02));
 
   scene.add(group);
   return { group, colliders };

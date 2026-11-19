@@ -1,7 +1,5 @@
 // VELAMAR v5 — procedural canvas textures (no image files, no network).
-// Every texture is drawn once from a seeded LCG, so the city looks the same
-// on every run. Used by city.js (facades, neon, containers, sand, sea) and
-// vehicles.js (asphalt sheen).
+// Drawn once from a seeded LCG, so the city looks the same every run.
 import * as THREE from 'three';
 
 // Small deterministic LCG (same family as random.js, local so this module
@@ -34,11 +32,11 @@ function toTex(c, repeat) {
 
 // Asphalt: dark grain + speckle + a wet sheen band that catches the sunset
 // and the police sirens (drawn as faint red/blue streaks).
-export function asphaltTexture(seed = 5) {
+export function asphaltTexture(seed = 5, base = '#3a4150') {
   const [c, g] = canvas(256, 256);
   const r = lcg(seed);
-  g.fillStyle = '#33373f'; g.fillRect(0, 0, 256, 256);
-  const dots = ['#2b2f36', '#3d424b', '#454a55', '#26292f', '#4a4f58'];
+  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  const dots = ['#323743', '#414653', '#4a505c', '#2e333d', '#525866'];
   for (let i = 0; i < 2600; i++) {
     g.fillStyle = dots[Math.floor(r() * dots.length)];
     const s = 1 + r() * 2.5;
@@ -50,9 +48,9 @@ export function asphaltTexture(seed = 5) {
   g.fillStyle = 'rgba(80,140,255,.05)';
   g.beginPath(); g.moveTo(0, 200); g.lineTo(256, 150); g.lineTo(256, 200); g.lineTo(0, 250); g.fill();
   // faint siren reflections
-  g.fillStyle = 'rgba(255,40,40,.10)';
+  g.fillStyle = 'rgba(255,40,40,.16)';
   g.fillRect(20, 0, 6, 256);
-  g.fillStyle = 'rgba(40,80,255,.10)';
+  g.fillStyle = 'rgba(40,80,255,.16)';
   g.fillRect(230, 0, 6, 256);
   return toTex(c, [10, 10]);
 }
@@ -212,11 +210,11 @@ export function cloudTexture(seed = 13) {
   const [c, g] = canvas(512, 256);
   const r = lcg(seed);
   g.clearRect(0, 0, 512, 256);
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 36; i++) {
     const x = r() * 512, y = 40 + r() * 150, rad = 22 + r() * 42;
     const grad = g.createRadialGradient(x, y, 2, x, y, rad);
-    grad.addColorStop(0, 'rgba(255,235,220,0.85)');
-    grad.addColorStop(0.6, 'rgba(255,210,200,0.35)');
+    grad.addColorStop(0, 'rgba(255,235,220,0.95)');
+    grad.addColorStop(0.6, 'rgba(255,210,200,0.45)');
     grad.addColorStop(1, 'rgba(255,200,190,0)');
     g.fillStyle = grad;
     g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();

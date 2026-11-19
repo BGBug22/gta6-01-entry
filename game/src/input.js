@@ -1,5 +1,5 @@
 // Input keyboard + mouse. Drag mouse = putar kamera; klik canvas = pointer lock
-// (opsional, drag tetap jalan tanpa lock supaya mudah dimainkan).
+// (optional, drag still works without lock for easy play).
 export class Input {
   constructor(canvas) {
     this.keys = {};

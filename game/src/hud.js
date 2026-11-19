@@ -1,6 +1,6 @@
 // HUD — all screen elements: health, armour, respect, wanted stars, money,
-// weapons, mission objective + distance + timer, city clock, dialog, district,
-// radio, speed + car name, center message, key prompt, start / pause / mission
+// weapons, mission objective + distance + timer, clock, dialog, district,
+// radio, speed + car name, center message, key prompt, start/pause/mission.
 // screens. v5: a POLICE UNITS summary line ("4 UNITS · 12m RAMMING ·
 // 28m SPOTLIGHT · 95m ROADBLOCK") shown while wanted >= 1.
 import { wantedLabel } from './wanted-level.js';

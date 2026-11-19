@@ -1,6 +1,6 @@
-// Combat — punches (F) + 4 functional weapons (keys 1-4: Fists, Pistol,
-// Micro-SMG, Shotgun). Dock enemies (mission 7): articulated thugs who
-// shoot back from close range. Muzzle flash + bullet tracers included.
+// Combat — punches (F) + 4 weapons (1-4: Fists, Pistol, Micro-SMG, Shotgun).
+// Dock enemies (mission 7): articulated thugs who shoot back. Muzzle
+// flash + bullet tracers included.
 import * as THREE from 'three';
 import { WEAPONS, WORLD } from './config.js';
 import { makeHuman, aimPose } from './human.js';
@@ -121,16 +121,16 @@ export class Combat {
   staticFlash(pos, dir) {
     const g = new THREE.Group();
     const core = new THREE.Mesh(
-      new THREE.SphereGeometry(0.32, 8, 6),
+      new THREE.SphereGeometry(0.55, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xfff2a0 }),
     );
     g.add(core);
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < 6; k++) {
       const spike = new THREE.Mesh(
-        new THREE.ConeGeometry(0.1, 1.0, 4),
+        new THREE.ConeGeometry(0.16, 1.6, 4),
         new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.9 }),
       );
-      spike.rotation.z = (k * Math.PI) / 2;
+      spike.rotation.z = (k * Math.PI) / 3;
       spike.position.set(0, 0, 0.35);
       g.add(spike);
     }

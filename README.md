@@ -1,123 +1,123 @@
-# VELAMAR — Kota Pelabuhan Matahari
+# VELAMAR — Sunny Harbor City
 
 [![make.fun](https://make.fun/badge/gta6-01.svg)](https://make.fun/c/gta6-01)
 [![rank](https://make.fun/badge/gta6-01/BGBug22/gta6-01-entry/rank.svg)](https://make.fun/c/gta6-01)
 [![reward](https://make.fun/badge/gta6-01/BGBug22/gta6-01-entry/reward.svg)](https://make.fun/c/gta6-01)
 
-Game open-world kriminal 3D untuk bounty **gta6-01 "Make GTA 6"** di make.fun.
-Kota orisinal yang cerah di tepi laut — bukan tiruan game mana pun.
+A 3D open-world crime game for the **gta6-01 "Make GTA 6"** bounty on make.fun.
+A bright original city on the seashore — not a copy of any game.
 
-## Kota
+## City
 
-**VELAMAR** — kota pelabuhan bermatahari di tepi laut biru. Landmark-nya
-**Faro Vela**, mercusuar merah-putih di ujung dermaga, terlihat dari mana pun
-di kota. Lima distrik dengan papan nama besar: Pelabuhan Vela, Kota Tua
-(Plaza Mercado), Pantai Azul, Distrik Kaca, dan jalan utama VELAMAR.
-Nama distrik juga dicat di jalan (decal tanah) supaya terbaca dari kamera atas.
-Gedung ber-grid jendela menyala dengan atap genteng hangat, zebra cross di
-semua persimpangan, pantai dengan payung warna-warni dan menara penjaga.
+**VELAMAR** — a sunny harbor city on a blue sea. Its landmark is
+**Faro Vela**, a red-white lighthouse at the end of the pier, visible from
+anywhere in the city. Five districts with big name signs: Puerto Vela, Old Town
+(Plaza Mercado), Playa Azul, Glass District, and the VELAMAR main road.
+District names are also painted on the road (ground decals) so they read from
+a high camera. Buildings with grids of lit windows and warm tile roofs, zebra
+crossings at every intersection, a beach with colorful umbrellas and lifeguard
+towers.
 
-## Mekanik jagoan
+## Signature mechanic
 
-**Curi mobil apa pun, kabur dari kejaran polisi 3 bintang sebelum waktu habis.**
-Setiap mobil yang terparkir bisa dicuri (tombol E) — dan setiap pencurian
-menaikkan wanted level. Polisi mengejar dengan mobil patroli dan jalan kaki,
-menabrak dan menangkapmu kalau lengah. Wanted 4 bintang ke atas: helikopter
-polisi mengorbit di atasmu.
+**Steal any car, outrun a 3-star police chase before time runs out.**
+Every parked car can be stolen (E key) — and every theft raises your wanted
+level. Police chase in patrol cars and on foot, ram and catch you if you slip.
+At wanted 4 stars and up: a police helicopter orbits above you.
 
-## Yang bisa dimainkan
+## What you can play
 
-- **Jalan kaki** (WASD + mouse, third person, lari dengan Shift) dan **nyetir**
-  mobil apa pun — masuk dengan E, keluar dengan E.
-- **Lalu lintas hidup**: 26 mobil AI mengikuti jalan + 44 pejalan kaki
-  berdetail (topi, warna kulit dan tinggi bervariasi, sebagian bawa ransel)
-  yang lari ketakutan kalau ada tembakan atau mobil ngebut.
-- **Wanted level 0–5 bintang**: naik saat mencuri mobil, menabrak pejalan
-  kaki, memukul warga, atau menembak. Polisi mengejar, menabrak mobilmu, dan
-  menangkapmu kalau kamu jalan kaki. Wanted 4+ = helikopter patroli.
-  Wanted memudar kalau kamu bersembunyi.
-- **Armour**: menyerap damage duluan sebelum health, pulih saat kamu aman
-  (wanted 0). **Respect**: naik 1 level tiap misi selesai (mentok LV 5).
-- **8 misi cerita "Tiga Hari di Velamar"** (Mara & Rico): antar paket, taksi
-  kilat, balapan jalanan 4 gerbang, curi Cometa GT, kabur dari polisi 3
-  bintang, **RAMPOK BANK VELA (heist — masuk bank, ambil rampasan, kabur ke
-  dermaga di bawah kejaran 2 bintang)**, tembak balik 3 preman dermaga, dan
-  pelarian terakhir ke kapal dengan 4 bintang. Tiap misi: objektif, timer,
-  hadiah uang, dialog karakter, layar selesai/gagal.
-- **Toko (tombol B, dekat toko)**: menu beli asli — pistol ($150), amunisi
-  +12 ($40), isi armour penuh ($100) di Toko Senjata "El Gatillo"; beli
-  Cometa GT ($1200) di dealer Cometa Motors. Beli pakai tombol 1/2/3 atau klik.
-- **Garasi Vela — upgrade (tombol B, dekat garasi)**: Mesin Turbo +10%
-  kecepatan per level (maks LV 3, $300), Armour Maks +25 per level (maks
-  LV 2, $250), isi armour penuh ($100). Upgrade tersimpan di save dan
-  berlaku untuk semua mobil milikmu.
-- **Aktivitas sampingan**: taksi dadakan (tombol T — jemput penumpang, antar,
-  dibayar $80).
-- **Combat**: pukul (F) + pistol (tombol 2, klik untuk tembak) dengan amunisi.
-- **Progresi**: uang dari misi & taksi — beli pistol ($150) + amunisi ($40) di
-  Toko Senjata "El Gatillo", beli Cometa GT ($1200) di dealer Cometa Motors,
-  upgrade mesin & armour di Garasi Vela. Progres tersimpan otomatis di
-  localStorage (lanjutkan dari layar start).
-- **HUD lengkap**: health, armour, respect, uang, senjata + amunisi, wanted
-  stars + label (DICARI POLISI / BURONAN / PALING DICARI), objektif + jarak
-  tujuan + timer misi, jam kota (DAY 1 18:24, maju saat main), dialog misi,
-  distrik, radio (SOL FM 95.4), kecepatan + nama mobil saat nyetir, minimap
-  live (pemain, polisi, target misi, mobil), crosshair, prompt tombol, dan
-  layar start / jeda / misi selesai / gagal / tertangkap / tumbang.
-- **Suara sintetis** (WebAudio, tanpa file): mesin, sirene polisi, tembakan,
-  koin misi.
+- **On foot** (WASD + mouse, third person, run with Shift) and **driving**
+  any car — enter with E, exit with E.
+- **Living traffic**: 26 AI cars following the roads + 44 detailed pedestrians
+  (hats, varied skin tones and heights, some with backpacks) who run in fear
+  from gunfire or speeding cars.
+- **Wanted level 0–5 stars**: rises when you steal a car, hit a pedestrian,
+  punch a citizen, or shoot. Police chase, ram your car, and catch you on
+  foot. Wanted 4+ = patrol helicopter. Wanted fades when you hide.
+- **Armour**: absorbs damage before health, regens when you are safe
+  (wanted 0). **Respect**: +1 level per mission completed (caps at LV 5).
+- **8 story missions "Three Days in Velamar"** (Mara & Rico): deliver a package,
+  flash cab, 4-gate street race, steal the Cometa GT, escape a 3-star chase,
+  **ROB VELA BANK (heist — enter the bank, grab the loot, run to the docks
+  under a 2-star chase)**, shoot back at 3 dock thugs, and a final escape to
+  the boat with 4 stars. Every mission: objective, timer, cash reward,
+  character dialog, pass/fail screens.
+- **Shops (B key, near a shop)**: a real buy menu — pistol ($150), ammo
+  +12 ($40), full armour refill ($100) at the "El Gatillo" gun store; buy
+  the Cometa GT ($1200) at Cometa Motors. Buy with keys 1/2/3 or click.
+- **Vela Garage — upgrades (B key, near the garage)**: Turbo Engine +10%
+  speed per level (max LV 3, $300), Max Armour +25 per level (max
+  LV 2, $250), full armour refill ($100). Upgrades persist in the save and
+  apply to every car you own.
+- **Side activity**: instant taxi (T key — pick up a fare, drop them off,
+  paid $80).
+- **Combat**: punch (F) + pistol (key 2, click to shoot) with ammo.
+- **Progression**: cash from missions & taxi — buy a pistol ($150) + ammo ($40)
+  at the "El Gatillo" gun store, buy the Cometa GT ($1200) at Cometa Motors,
+  upgrade engine & armour at Vela Garage. Progress auto-saves to
+  localStorage (continue from the start screen).
+- **Full HUD**: health, armour, respect, money, weapon + ammo, wanted
+  stars + label (WANTED BY POLICE / FUGITIVE / MOST WANTED), objective + target
+  distance + mission timer, city clock (DAY 1 18:24, advances as you play),
+  mission dialog, district, radio (SOL FM 95.4), speed + car name while
+  driving, live minimap (player, police, mission target, cars), crosshair,
+  button prompts, and start / pause / mission pass / fail / busted / wasted
+  screens.
+- **Synthesized sound** (WebAudio, no files): engine, police sirens, gunshots,
+  mission coins.
 
-## Kontrol
+## Controls
 
-| Tombol | Aksi |
+| Key | Action |
 |---|---|
-| WASD / panah | Jalan / nyetir |
-| Mouse (drag) | Putar kamera |
-| Shift | Lari |
-| E | Masuk / keluar mobil |
-| F | Pukul |
-| Klik kiri | Tembak (pistol) |
-| 1 / 2 | Tangan kosong / pistol |
-| M | Mulai misi berikutnya |
-| T | Taksi dadakan |
-| B | Beli (di dekat toko) |
-| H | Klakson |
-| P / Esc | Jeda |
+| WASD / arrows | Walk / drive |
+| Mouse (drag) | Rotate camera |
+| Shift | Run |
+| E | Enter / exit car |
+| F | Punch |
+| Left click | Shoot (pistol) |
+| 1 / 2 | Fists / pistol |
+| M | Start next mission |
+| T | Instant taxi |
+| B | Buy (near a shop) |
+| H | Horn |
+| P / Esc | Pause |
 
-## Cara main
+## How to play
 
-Buka `game/index.html` lewat server statis apa pun (mis. `node serve.ts`,
-lalu http://localhost:8080). Game berjalan offline sepenuhnya — three.js
-di-vendor lokal di `game/vendor/three.module.min.js`, tanpa network request.
+Open `game/index.html` through any static server (e.g. `node serve.ts`,
+then http://localhost:8080). The game runs fully offline — three.js is
+vendored locally in `game/vendor/three.module.min.js`, with no network requests.
 
-## Struktur source
+## Source structure
 
-| File | Tugas |
+| File | Job |
 |---|---|
-| `game/src/main.js` | Loop utama, kontrol pemain, kamera, toko, save |
-| `game/src/config.js` | Dunia, distrik, kendaraan, misi, dialog, angka game |
-| `game/src/city.js` | Membangun kota: jalan, gedung, pantai, Faro Vela |
-| `game/src/vehicles.js` | Pabrik mobil 3D + fisika mengemudi arcade |
-| `game/src/traffic.js` | Mobil lalu lintas AI + pejalan kaki berdetail |
-| `game/src/police-chase.js` | Polisi + wanted level 0–5 + helikopter |
-| `game/src/wanted-level.js` | Aturan wanted murni (jumlah unit, label, armour) |
-| `game/src/story-campaign.js` | Rantai 8 misi (termasuk heist) + dialog + aktivitas sampingan |
-| `game/src/textures.js` | Tekstur prosedural (aspal, fasad Art Deco, neon, kontainer, pasir, laut, matahari, awan) |
-| `game/src/human.js` | Karakter manusia 3D berartikulasi (jalan, aim, idle, senjata) |
-| `game/src/combat.js` | Pukul, pistol, musuh dermaga |
-| `game/src/hud.js` | HUD + menu beli + layar start/pause/misi |
-| `game/src/minimap.js` | Minimap canvas live |
+| `game/src/main.js` | Main loop, player controls, camera, shops, save |
+| `game/src/config.js` | World, districts, vehicles, missions, dialogs, game numbers |
+| `game/src/city.js` | Builds the city: roads, buildings, beach, Faro Vela |
+| `game/src/vehicles.js` | 3D car factory + arcade driving physics |
+| `game/src/traffic.js` | AI traffic cars + detailed pedestrians |
+| `game/src/police-chase.js` | Police + wanted level 0–5 + helicopter |
+| `game/src/wanted-level.js` | Pure wanted rules (unit counts, labels, armour) |
+| `game/src/story-campaign.js` | 8-mission chain (including heist) + dialog + side activity |
+| `game/src/textures.js` | Procedural textures (asphalt, Art Deco facades, neon, containers, sand, sea, sun, clouds) |
+| `game/src/human.js` | Articulated 3D humans (walk, aim, idle, weapons) |
+| `game/src/combat.js` | Punch, pistol, dock enemies |
+| `game/src/hud.js` | HUD + buy menu + start/pause/mission screens |
+| `game/src/minimap.js` | Live minimap canvas |
 | `game/src/input.js` | Keyboard + mouse |
-| `game/src/audio.js` | Suara sintetis WebAudio |
-| `game/src/save.js` | Save/load localStorage (termasuk upgrade garasi) |
-| `game/src/screenshot-staging.js` | Mode screenshot chase-camera deterministik (`?shot=...`) |
-| `game/src/random.js` | RNG deterministik (seeded) |
+| `game/src/audio.js` | Synthesized WebAudio sound |
+| `game/src/save.js` | Save/load localStorage (including garage upgrades) |
+| `game/src/screenshot-staging.js` | Deterministic chase-camera screenshot mode (`?shot=...`) |
+| `game/src/random.js` | Deterministic seeded RNG |
 
-## Screenshot
+## Screenshots
 
-Empat screenshot deterministik diambil dari game yang benar-benar jalan
-(`shots.json`), semuanya kamera chase 3D street-level: kejar-kejaran golden-hour
-di boulevard pantai dengan Cometa GT + helikopter + mercusuar Faro Vela,
-kabur heist malam dari Bank Vela dengan sorot searchlight helikopter,
-tembak-menembak jalan kaki di Dermaga Puerto Vela (kontainer + crane + kapal),
-dan siang cerah di Plaza Mercado dengan banner "MISSION PASSED! +$5,000".
+Four deterministic screenshots taken from the game actually running
+(`shots.json`), all 3D street-level chase cameras: a golden-hour chase on
+the beach boulevard with the Cometa GT + helicopter + Faro Vela lighthouse,
+a night heist escape from Vela Bank under the helicopter searchlight,
+on-foot gunfight at the Puerto Vela Docks (containers + crane + ship),
+and a bright day at Plaza Mercado with a "MISSION PASSED! +$5,000" banner.

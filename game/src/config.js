@@ -1,7 +1,7 @@
-// VELAMAR v5 — world config, districts, vehicles, missions, dialogs, numbers.
-// The single place world numbers are defined; every other system reads them.
-// ALL user-facing text is English. Place names stay iconic (Velamar, Faro Vela,
-// Playa Azul, Plaza Mercado, Puerto Vela).
+// VELAMAR v5 — world config, districts, vehicles, missions, dialogs.
+// The single place world numbers are defined; every system reads them.
+// ALL user-facing text is English. Place names stay iconic (Velamar,
+// Faro Vela, Playa Azul, Plaza Mercado, Puerto Vela).
 export const WORLD = {
   name: 'VELAMAR',
   tagline: 'Sunny Harbor City',
@@ -20,7 +20,7 @@ export const DISTRICTS = [
   // the incoming player so the text reads correctly, not mirrored.
   { name: 'VELAMAR', sub: 'HARBOR CITY', x: 0, z: 0, color: '#ffd23f', big: true, ry: 0 },
   { name: 'PUERTO VELA', sub: 'DOCKS • FARO VELA', x: -210, z: -190, color: '#ff5d5d', ry: -0.98 },
-  { name: 'KOTA TUA', sub: 'PLAZA MERCADO', x: 80, z: 160, color: '#7ee081', ry: -2.03 },
+  { name: 'OLD TOWN', sub: 'PLAZA MERCADO', x: 80, z: 160, color: '#7ee081', ry: -2.03 },
   { name: 'PLAYA AZUL', sub: 'SUN BOULEVARD', x: -240, z: 160, color: '#4cc9f0', ry: 3.14159 },
   { name: 'GLASS DISTRICT', sub: 'TOWERS • OFFICES', x: 190, z: -160, color: '#f72585', ry: -1.5708 },
 ];

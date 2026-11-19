@@ -1,8 +1,6 @@
-// Vehicles — sporty 3D car factory (body, cabin, wheels, lights) + driving state.
-// Player cars, traffic cars, and police cars all use this factory.
-// v5: low/wide sporty body with a sloped hood, glossy windshield, visible
-// fenders, a rear spoiler, glowing brake lights, headlight beams, and a
-// bright red/blue police lightbar.
+// Vehicles — sporty 3D car factory (body, cabin, wheels, lights) + driving.
+// v5: low/wide sporty body, sloped hood, glossy windshield, spoiler,
+// glowing brake lights, headlight beams, bright police lightbar.
 import * as THREE from 'three';
 import { CAR_MODELS } from './config.js';
 
@@ -10,13 +8,13 @@ function lam(color, opts = {}) {
   return new THREE.MeshLambertMaterial({ color, ...opts });
 }
 function phong(color, shininess = 90) {
-  return new THREE.MeshPhongMaterial({ color, shininess, specular: 0x888888 });
+  return new THREE.MeshPhongMaterial({ color, shininess, specular: 0xbbbbbb });
 }
 
 export function makeCarMesh(model, opts = {}) {
   const g = new THREE.Group();
   const sporty = model.id === 'sport' || model.id === 'coupe';
-  const bodyMat = phong(model.color, sporty ? 120 : 60);
+  const bodyMat = phong(model.color, sporty ? 180 : 60);
   // low/wide main body
   const body = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.62, 4.5), bodyMat);
   body.position.y = 0.58; g.add(body);
@@ -67,22 +65,22 @@ export function makeCarMesh(model, opts = {}) {
     h.position.set(x, 0.62, 2.28); g.add(h);
   }
   const beamMat = new THREE.MeshBasicMaterial({
-    color: 0xfff2c9, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false,
+    color: 0xfff2c9, transparent: true, opacity: 0.04, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const beamGeo = new THREE.ConeGeometry(0.9, 7, 10, 1, true);
+  const beamGeo = new THREE.ConeGeometry(0.5, 3, 10, 1, true);
   for (const x of [-0.68, 0.68]) {
     const beam = new THREE.Mesh(beamGeo, beamMat);
     beam.rotation.x = -Math.PI / 2 - 0.06; // point forward (+z)
-    beam.position.set(x, 0.55, 5.6);
+    beam.position.set(x, 0.55, 3.75);
     g.add(beam);
   }
   // brake lights (glowing red bar) + reverse lights
-  const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
   const tailBar = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.16, 0.08), tailMat);
   tailBar.position.set(0, 0.66, -2.28); g.add(tailBar);
   const tailGlow = new THREE.Mesh(
     new THREE.PlaneGeometry(1.9, 0.5),
-    new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.30, side: THREE.DoubleSide, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }),
   );
   tailGlow.position.set(0, 0.66, -2.34); g.add(tailGlow);
   // rear spoiler (sporty models)

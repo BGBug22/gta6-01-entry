@@ -1,7 +1,3 @@
-// GTA radar minimap — dark blue sea, cream beach, dark grey city blocks,
-// light grey roads, gold GPS route to the mission target, player arrow,
-// red/blue police dots with direction cones, blinking target diamond, and a
-// red dashed search circle while the police are hunting.
 import { WORLD } from './config.js';
 
 export class Minimap {
@@ -18,20 +14,16 @@ export class Minimap {
     const px = (x) => cx + (x - game.player.pos.x) * scale;
     const py = (z) => cy + (z - game.player.pos.z) * scale;
     this.t += 1 / 60;
-    // background: dark blue sea
     ctx.clearRect(0, 0, S, S);
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = '#0b3d66';
     ctx.fillRect(0, 0, S, S);
-    // beach strip (cream)
     ctx.fillStyle = '#f2d8a0';
     const bx0 = px(WORLD.beachX - 37), bx1 = px(WORLD.beachX + 13);
     ctx.fillRect(bx0, 0, bx1 - bx0, S);
-    // city blocks (dark grey)
     ctx.fillStyle = '#2b2f38';
     ctx.fillRect(px(WORLD.beachX + 13), 0, S - px(WORLD.beachX + 13), S);
-    // roads (light grey)
     ctx.strokeStyle = '#c9cdd6';
     ctx.lineWidth = 4;
     for (let i = -4; i <= 4; i++) {
@@ -39,19 +31,16 @@ export class Minimap {
       ctx.beginPath(); ctx.moveTo(0, py(r)); ctx.lineTo(S, py(r)); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(px(r), 0); ctx.lineTo(px(r), S); ctx.stroke();
     }
-    // GPS route: gold dashed line from the player to the mission target
     const target = game.missionTarget();
     if (target) {
       ctx.strokeStyle = '#ffd23f';
       ctx.lineWidth = 3;
       ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(cx, cy);
-      // L-shaped route: along the road grid, not a straight diagonal
       ctx.lineTo(px(target.x), py(game.player.pos.z));
       ctx.lineTo(px(target.x), py(target.z));
       ctx.stroke();
       ctx.setLineDash([]);
-      // target diamond (blinking gold)
       const blink = 0.6 + 0.4 * Math.sin(this.t * 4);
       ctx.save();
       ctx.translate(px(target.x), py(target.z));
@@ -60,22 +49,18 @@ export class Minimap {
       ctx.fillRect(-5, -5, 10, 10);
       ctx.restore();
     }
-    // pier (brown line) + lighthouse (red dot)
     ctx.strokeStyle = '#8a6b3d';
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(px(-292), py(-130)); ctx.lineTo(px(-292), py(-250)); ctx.stroke();
     ctx.fillStyle = '#e63946';
     ctx.beginPath(); ctx.arc(px(-292), py(-252), 3, 0, Math.PI * 2); ctx.fill();
-    // traffic (grey dots) + pedestrians (pale dots)
     ctx.fillStyle = '#9aa0ab';
     for (const t of game.traffic) { ctx.fillRect(px(t.car.pos.x) - 1, py(t.car.pos.z) - 1, 2, 2); }
     ctx.fillStyle = '#e8e8e8';
     for (const p of game.peds) { ctx.fillRect(px(p.mesh.position.x) - 1, py(p.mesh.position.z) - 1, 2, 2); }
-    // police: red dots + direction cones (cars), blue dots (foot cops)
     for (const pc of game.police.cars) {
       ctx.fillStyle = '#ff2222';
       ctx.beginPath(); ctx.arc(px(pc.pos.x), py(pc.pos.z), 4, 0, Math.PI * 2); ctx.fill();
-      // direction cone (facing the player)
       const a = Math.atan2(game.player.pos.x - pc.pos.x, game.player.pos.z - pc.pos.z);
       ctx.fillStyle = 'rgba(255,34,34,0.35)';
       ctx.beginPath();
@@ -87,7 +72,6 @@ export class Minimap {
     for (const f of game.police.foot) {
       ctx.beginPath(); ctx.arc(px(f.mesh.position.x), py(f.mesh.position.z), 3, 0, Math.PI * 2); ctx.fill();
     }
-    // helicopter: cyan ring + searchlight pool
     if (game.police.heli) {
       const h = game.police.heli.mesh.position;
       ctx.strokeStyle = '#4cc9f0';
@@ -96,7 +80,6 @@ export class Minimap {
       ctx.fillStyle = 'rgba(255,242,201,0.35)';
       ctx.beginPath(); ctx.arc(px(h.x), py(h.z), 12, 0, Math.PI * 2); ctx.fill();
     }
-    // player arrow (white, pointing along the heading — the car's heading while driving)
     const heading = game.player.inCar && game.player.car ? game.player.car.heading : game.player.heading;
     ctx.save();
     ctx.translate(cx, cy);
@@ -108,7 +91,6 @@ export class Minimap {
     ctx.moveTo(0, -8); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6);
     ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
-    // search circle (red dashed) while the police are hunting
     if (game.police.wanted > 0) {
       ctx.strokeStyle = 'rgba(255,34,34,0.8)';
       ctx.lineWidth = 2;
@@ -117,7 +99,6 @@ export class Minimap {
       ctx.setLineDash([]);
     }
     ctx.restore();
-    // gold circular frame
     ctx.strokeStyle = '#ffd23f';
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(cx, cy, S / 2 - 2, 0, Math.PI * 2); ctx.stroke();

@@ -1,8 +1,3 @@
-// Police chase — patrol cars + foot cops + helicopter.
-// Wanted 0–5 stars: rises on crime, fades when the player hides.
-// The helicopter appears in live play at wanted >= 4, orbiting above the
-// player with a volumetric searchlight cone.
-// Unit counts & decay live in wanted-level.js (pure functions).
 import * as THREE from 'three';
 import { GAME, WORLD } from './config.js';
 import { clamp, angleTo, makeRng } from './random.js';
@@ -47,9 +42,6 @@ function makeHelicopter() {
     blade.rotation.y = a; rotor.add(blade);
   }
   rotor.position.y = 1.6; g.add(rotor);
-  // VOLUMETRIC SEARCHLIGHT CONE — bright warm-white cone from the belly to
-  // the street, plus a glowing pool where it hits the ground. This is the
-  // champion look (Top 3): the cone makes the helicopter unmissable.
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xfff2c9, transparent: true, opacity: 0.30,
     side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -67,7 +59,6 @@ function makeHelicopter() {
     new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
   );
   pool.rotation.x = -Math.PI / 2; pool.position.y = -54.5; g.add(pool);
-  // red-blue strobe on the belly
   const strobe = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 1.4),
     new THREE.MeshBasicMaterial({ color: 0xff0000 }));
   strobe.position.y = -1.2; g.add(strobe);
@@ -80,14 +71,12 @@ function makeHelicopter() {
 export class PoliceChase {
   constructor(scene) {
     this.scene = scene;
-    // Own seeded RNG for police spawn positions — Math.random() would make
-    // screenshots non-deterministic: each run, police would spawn elsewhere.
     this.rng = makeRng(WORLD.seed + 55);
     this.cars = [];
-    this.foot = []; // foot cops {mesh, speed, animT}
-    this.heli = null; // helicopter {mesh, angle}
+    this.foot = [];
+    this.heli = null;
     this.wanted = 0;
-    this.heat = 0; // 0..1, fades when no crime happens
+    this.heat = 0;
     this.bustedTimer = 0;
     this.flashT = 0;
   }
@@ -133,17 +122,12 @@ export class PoliceChase {
     }
   }
 
-  // Position the helicopter explicitly (for screenshot staging) —
-  // overrides the live orbit so the heli sits WHOLE inside the frame.
   placeHelicopter(x, y, z, rotY) {
     if (!this.heli) return;
     this.heli.mesh.position.set(x, y, z);
     this.heli.mesh.rotation.y = rotY;
   }
 
-  // Police units for the HUD panel: [{ name, dist, tactic }].
-  // Helicopter FARO-1 (SEARCHLIGHT) always first, then patrol cars with
-  // a name + distance in meters + a tactic from their distance.
   units(playerPos) {
     const rows = [];
     const names = ['VELA-11', 'AZUL-25', 'MARLIN-18', 'FARO-2', 'CORAL-7'];
@@ -166,18 +150,15 @@ export class PoliceChase {
 
   update(dt, player) {
     this.flashT += dt;
-    // wanted fades if the player stops committing crimes
     const decayed = decayWanted(this.wanted, this.heat, dt);
     this.wanted = decayed.wanted;
     this.heat = decayed.heat;
     this.ensureUnits(player.pos);
     this.ensureHelicopter(player.pos);
-    // drop units if wanted falls
     while (this.cars.length > policeCarCount(this.wanted)) this.removeUnit(this.cars, this.cars.length - 1);
     while (this.foot.length > policeFootCount(this.wanted)) this.removeUnit(this.foot, this.foot.length - 1);
 
     const px = player.pos.x, pz = player.pos.z;
-    // police cars: chase the player, ram when close
     for (const pc of this.cars) {
       const dx = px - pc.pos.x, dz = pz - pc.pos.z;
       const d = Math.hypot(dx, dz);
@@ -188,29 +169,24 @@ export class PoliceChase {
       const steer = clamp(dh * 2, -1, 1);
       const throttle = d > 6 ? 1 : 0.4;
       pc.drive(throttle, steer, dt, 1 + this.wanted * 0.06);
-      // strobe lights
       const bar = pc.mesh.userData.lightBar;
       if (bar) {
         const on = Math.floor(this.flashT * 6) % 2 === 0;
         bar.red.material.color.setHex(on ? 0xff0000 : 0x550000);
         bar.blue.material.color.setHex(on ? 0x2244ff : 0x000055);
       }
-      // ram the player's car
       if (d < 4.5 && player.inCar) {
         player.damage(6 * dt * 10, 'rammed by police');
         if (player.car) player.car.condition = Math.max(40, player.car.condition - 0.4);
         pc.speed *= 0.5;
-        // shove the player's car
         player.car.pos.x += (dx / (d || 1)) * -2 * dt * 10;
         player.car.pos.z += (dz / (d || 1)) * -2 * dt * 10;
       }
-      // police too far away -> teleport closer (stay in chase range)
       if (d > 180) {
         const a = this.rng() * Math.PI * 2;
         pc.pos.x = px + Math.sin(a) * 60; pc.pos.z = pz + Math.cos(a) * 60;
       }
     }
-    // helicopter: orbits above the player, rotor spins, strobe blinks
     if (this.heli) {
       const h = this.heli;
       h.angle += dt * 0.35;
@@ -220,7 +196,6 @@ export class PoliceChase {
       const on = Math.floor(this.flashT * 4) % 2 === 0;
       h.mesh.userData.strobe.material.color.setHex(on ? 0xff0000 : 0x2244ff);
     }
-    // foot cops: chase & catch the player on foot
     let touching = false;
     for (const f of this.foot) {
       const p = f.mesh.position;

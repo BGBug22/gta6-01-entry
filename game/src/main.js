@@ -1,7 +1,3 @@
-// VELAMAR — open-world crime game. Entry: world, main loop, controls,
-// wanted/police + heli, missions, combat, shops, saves, clock, respect,
-// chase camera. v5: ACES tone mapping, articulated player, 4 weapons,
-// 3 radio stations, 100% English UI.
 import * as THREE from 'three';
 import { WORLD, DISTRICTS, CAR_MODELS, SHOPS, MISSIONS, GAME, DENSITY, CLOCK, ARMOUR, RADIO, SHOP_PRICES, SHOP_LIMITS, WEAPONS } from './config.js';
 import { makeRng, pick, range, clamp, dist2 } from './random.js';
@@ -22,7 +18,6 @@ import { makeHuman, walkPose, aimPose, idlePose, setWeapon } from './human.js';
 
 class Player {
   constructor(scene) {
-    // Articulated 3D human: teal jacket, yellow cap, dark pants.
     this.mesh = makeHuman({
       skin: 0xf1c27d,
       jacket: 0x2a9d8f,
@@ -31,8 +26,6 @@ class Player {
       cap: true,
       capColor: 0xffd23f,
     });
-    // Yellow ring under the player — clearly visible from the top camera,
-    // telling the player apart from other pedestrians.
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.95, 1.25, 24),
       new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
@@ -46,10 +39,9 @@ class Player {
     this.armour = ARMOUR.start;
     this.inCar = false;
     this.car = null;
-    this.animT = 0; // simulation clock for the walk cycle (deterministic)
+    this.animT = 0;
     scene.add(this.mesh);
   }
-  // Damage goes to armour first; the rest hits health.
   damage(amount, cause) {
     const r = absorbDamage(amount, this.armour, this.health);
     this.armour = r.armour;
@@ -64,14 +56,10 @@ class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    // ACES filmic tone mapping — the golden-hour look: warm highlights,
-    // deep shadows, no blown-out sky. Exposure 1.15.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    // near-plane 0.5 (not 0.1): from the low chase camera, road vs sidewalk
-    // no longer z-fights in the distance.
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 1500);
     this.input = new Input(canvas);
     this.hud = new Hud();
@@ -82,18 +70,18 @@ class Game {
     this.frozen = false;
     this.shotMode = shot;
     this.night = shot === 'heist-night';
-    this.shopOpen = false; // buy menu open (game paused)
-    this.shopKind = null; // 'weapon' | 'car' | 'garage'
-    this.upgrades = { engine: 0, armour: 0 }; // garage upgrades: engine + max armour
+    this.shopOpen = false;
+    this.shopKind = null;
+    this.upgrades = { engine: 0, armour: 0 };
     this.maxArmour = ARMOUR.max;
     this.carSpeedMul = 1;
-    this.topDown = false; // top camera (screenshot mode)
+    this.topDown = false;
     this.topDownHeight = 240;
     this.topDownOffset = { x: 0, z: 0 };
     this.money = GAME.startMoney;
     this.respect = 1;
     this.clockDay = CLOCK.day;
-    this.clockMin = CLOCK.hour * 60 + CLOCK.minute; // minutes since 00:00
+    this.clockMin = CLOCK.hour * 60 + CLOCK.minute;
     this.districtName = 'VELAMAR';
     this.ownedCars = [];
     this.enemies = [];
@@ -102,14 +90,15 @@ class Game {
     this.taxiFare = null;
     this.taxiPassenger = null;
     this.cameraYaw = Math.PI;
-    this.cameraPitch = 0.22; // low chase camera behind the car
+    this.cameraPitch = 0.22;
     this.camDist = 11.5;
-    this.cameraSide = 0; // lateral camera shift (win shot: car to the right of the frame)
-    this.camLookSide = 0; // shift the AIM POINT only — the car moves on screen
-    // (cameraSide shifts camera + aim together, so the car stays centered).
+    this.cameraSide = 0;
+    this.camLookSide = 0;
 
-    const { colliders } = buildCity(this.scene, { night: this.night });
+    const { colliders, clouds, roadMats } = buildCity(this.scene, { night: this.night });
     this.colliders = colliders;
+    this.clouds = clouds;
+    this.roadMats = roadMats;
     this.traffic = spawnTraffic(this.scene, DENSITY.traffic);
     this.peds = spawnPedestrians(this.scene, DENSITY.pedestrians);
     this.parked = this.spawnParkedCars();
@@ -121,7 +110,6 @@ class Game {
 
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') this.tryStartMission(); });
-    // Buy-menu keys — active only while a shop/garage menu is open.
     window.addEventListener('keydown', (e) => {
       if (!this.shopOpen) return;
       if (e.code === 'Digit1') this.buyShopItem(0);
@@ -140,8 +128,6 @@ class Game {
 
   spawnParkedCars() {
     const rng = makeRng(WORLD.seed + 33);
-    // Parked cars ALWAYS sit on a road (not mid-block) with a road-aligned
-    // heading, so they can be driven away without getting stuck on a building.
     const spots = [
       { x: -200, z: 0, h: Math.PI / 2 }, { x: -120, z: 0, h: Math.PI / 2 },
       { x: 120, z: 0, h: Math.PI / 2 }, { x: 200, z: 0, h: Math.PI / 2 },
@@ -174,13 +160,11 @@ class Game {
     this.carSpeedMul = 1 + 0.1 * this.upgrades.engine;
   }
 
-  // Mission target for the minimap GPS route + distance readout.
   missionTarget() {
     if (this.taxiFare) return this.taxiFare.stage === 'pickup' ? this.taxiFare.pickup : this.taxiFare.drop;
     return this.missions.targetPos();
   }
 
-  // ---------- screens ----------
   showStartScreen() {
     const save = loadSave();
     const txt = save
@@ -206,7 +190,6 @@ class Game {
       this.applyUpgrades();
       if (save.hasPistol) {
         this.combat.hasPistol = true;
-        // old saves stored ammo as a number (pistol only); new saves store an object
         if (typeof save.ammo === 'number') this.combat.ammo.pistol = save.ammo;
         else if (save.ammo) this.combat.ammo = { pistol: 0, smg: 0, shotgun: 0, ...save.ammo };
       }
@@ -223,7 +206,6 @@ class Game {
     this.hud.showScreen('PAUSED', `Money <b>$${this.money}</b> • Mission <b>${this.missions.index + 1}/8</b> • Wanted <b>${this.police.wanted}★</b><br>Progress saves automatically.`, '▶ CONTINUE', () => { this.paused = false; });
   }
 
-  // ---------- missions ----------
   tryStartMission() {
     if (!this.started || this.paused || this.hud.screenVisible()) return;
     if (this.missions.state === 'active') {
@@ -294,7 +276,6 @@ class Game {
     if (this.taxiPassenger) { this.scene.remove(this.taxiPassenger); this.taxiPassenger = null; }
   }
 
-  // ---------- enter / exit car ----------
   enterCar(car) {
     const p = this.player;
     p.inCar = true; p.car = car;
@@ -305,7 +286,6 @@ class Game {
       this.hud.showMessage('Car stolen! Wanted +1★');
       this.sound.horn();
     }
-    // taxi: the fare rides along if a taxi mission is active
     this.camDist = 11.5;
   }
   exitCar() {
@@ -320,7 +300,6 @@ class Game {
     this.camDist = 10;
   }
 
-  // ---------- shops & garage ----------
   nearestShop() {
     const p = this.player.pos;
     if (dist2(p.x, p.z, SHOPS.weapon.x, SHOPS.weapon.z) < 100) return 'weapon';
@@ -335,7 +314,6 @@ class Game {
   }
   shopItemsFor(kind) {
     if (kind === 'weapon') {
-      // 5 items: Pistol, Micro-SMG, Shotgun, Ammo +12, Full Armour
       const w = (id) => ({
         name: WEAPONS[id].name, price: SHOP_PRICES[id === 'pistol' ? 'pistol' : id],
         note: this.combat.owned[id] ? 'OWNED' : 'weapon',
@@ -358,7 +336,6 @@ class Game {
         { name: 'Full Armour', price: SHOP_PRICES.armourRefill, note: `armour → ${this.maxArmour}`, disabled: this.player.armour >= this.maxArmour },
       ];
     }
-    // garage — upgrades for owned cars: engine (speed) + max armour
     return [
       { name: `Turbo Engine +10% (LV ${this.upgrades.engine}/${SHOP_LIMITS.engineMax})`, price: SHOP_PRICES.engine, note: this.upgrades.engine >= SHOP_LIMITS.engineMax ? 'MAX' : 'all your cars', disabled: this.upgrades.engine >= SHOP_LIMITS.engineMax },
       { name: `Max Armour +25 (LV ${this.upgrades.armour}/${SHOP_LIMITS.armourMaxLevel})`, price: SHOP_PRICES.armourMax, note: this.upgrades.armour >= SHOP_LIMITS.armourMaxLevel ? 'MAX' : `max → ${this.maxArmour + 25}`, disabled: this.upgrades.armour >= SHOP_LIMITS.armourMaxLevel },
@@ -378,7 +355,6 @@ class Game {
     this.shopOpen = false;
     this.shopKind = null;
     this.hud.hideShop();
-    // Clear keys pressed while the menu was open — don't leak them into the game.
     this.input.pressed = {};
     this.input.keys['KeyB'] = false;
     this.input.keys['Escape'] = false;
@@ -405,7 +381,7 @@ class Game {
         const model = CAR_MODELS.find((m) => m.id === SHOPS.car.carId);
         this.ownedCars.push(model.id);
         const car = new Car(this.scene, model, SHOPS.garage.x, SHOPS.garage.z, 0);
-        car.stolen = true; // owned, not stolen
+        car.stolen = true;
         this.parked.push(car);
         this.hud.showMessage(`Cometa GT bought! ($${model.price}) — parked at Vela Garage.`);
       } else if (i === 1) {
@@ -437,7 +413,6 @@ class Game {
   }
   updateWeaponLine() {
     const w = this.combat.weapon;
-    // 4 weapon slots: Fists, Pistol, Micro-SMG, Shotgun.
     const slots = [
       { icon: '✊', name: 'FISTS', ammo: '∞', active: w === 'fist', locked: false },
       { icon: '🔫', name: 'PISTOL', ammo: this.combat.owned.pistol ? `${this.combat.ammo.pistol}/${WEAPONS.pistol.ammo}` : '🔒', active: w === 'pistol', locked: !this.combat.owned.pistol },
@@ -447,11 +422,9 @@ class Game {
     this.hud.setWeaponSlots(slots);
     const ammo = w === 'fist' ? '∞' : `${this.combat.ammo[w]}/${WEAPONS[w].ammo}`;
     this.hud.setWeapon(`${WEAPONS[w].name} — ${ammo}`);
-    // show the weapon in the player's hand
     if (this.player && this.player.mesh) setWeapon(this.player.mesh, w);
   }
 
-  // ---------- side taxi ----------
   startTaxiFare() {
     if (this.taxiFare || this.missions.state === 'active') { this.hud.showMessage('Finish what you started first!'); return; }
     const spots = [{ x: 120, z: -80 }, { x: -40, z: 120 }, { x: 200, z: -40 }, { x: 0, z: 200 }];
@@ -464,7 +437,6 @@ class Game {
     this.sound.coin();
   }
 
-  // ---------- loop ----------
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -487,7 +459,6 @@ class Game {
   stepWorld(dt, staging) {
     const input = this.input;
     const p = this.player;
-    // global keys
     if (input.hit('KeyP') || input.hit('Escape')) this.pauseGame();
     if (input.hit('KeyN') && !this.started) { clearSave(); location.reload(); }
     if (input.hit('Digit1')) { this.combat.weapon = 'fist'; this.updateWeaponLine(); }
@@ -512,13 +483,11 @@ class Game {
     this.cameraYaw -= mouse.dx * 0.004;
     this.cameraPitch = clamp(this.cameraPitch + mouse.dy * 0.003, 0.08, 1.1);
 
-    // --- city clock advances while playing ---
     if (!staging && this.started && !this.paused) {
       this.clockMin += dt * CLOCK.minutesPerSecond;
       if (this.clockMin >= 1440) { this.clockMin -= 1440; this.clockDay += 1; }
     }
 
-    // --- player movement ---
     if (!p.inCar) {
       const mv = input.moveVector();
       const run = input.down('ShiftLeft') || input.down('ShiftRight');
@@ -535,7 +504,6 @@ class Game {
         p.heading = Math.atan2(mx, mz);
         p.mesh.rotation.y = p.heading;
         p.animT += dt * speed * 0.9;
-        // walk cycle (arms + legs swing); aim pose on top when a gun is out
         walkPose(p.mesh, p.animT, run ? 1.4 : 1);
         if (this.combat.weapon !== 'fist') aimPose(p.mesh);
       } else {
@@ -546,17 +514,14 @@ class Game {
       resolveColliders(p.pos, 0.7, this.colliders);
       p.pos.x = clamp(p.pos.x, -WORLD.halfSize - 20, WORLD.halfSize);
       p.pos.z = clamp(p.pos.z, -WORLD.halfSize, WORLD.halfSize);
-      // enter a car
       if (input.hit('KeyE')) {
         const car = nearestCar(this.parked, p.pos.x, p.pos.z, 5);
         if (car) this.enterCar(car);
       }
-      // punch
       if (input.hit('KeyF')) {
         const targets = [...this.enemies, ...this.peds.map((pd) => ({ pos: pd.mesh.position, ped: pd }))];
         if (this.combat.punch(p, targets, (t, dmg) => this.hitTarget(t, dmg))) this.sound.punch();
       }
-      // shoot (any owned gun, not fists)
       if (input.consumeClick() && this.combat.weapon !== 'fist') {
         const res = this.combat.shoot(p, this.camera, this.enemies, (t, dmg) => this.hitTarget(t, dmg));
         if (res === 'hit' || res === 'miss') { this.sound.shot(); if (this.police.wanted < 2) this.police.addWanted(1, 'gunfire'); }
@@ -564,7 +529,6 @@ class Game {
         if (res === 'no-weapon') this.hud.showMessage('Select a gun first (keys 2–4).');
       }
     } else {
-      // --- driving ---
       const mv = input.moveVector();
       const throttle = mv.z < 0 ? 1 : mv.z > 0 ? -1 : 0;
       const steer = mv.x;
@@ -572,10 +536,7 @@ class Game {
       resolveColliders(p.car.pos, 2.2, this.colliders);
       p.car.pos.x = clamp(p.car.pos.x, -WORLD.halfSize - 20, WORLD.halfSize);
       p.car.pos.z = clamp(p.car.pos.z, -WORLD.halfSize, WORLD.halfSize);
-      // The player position MUST follow the car — police, missions, and the
-      // minimap all read player.pos (not the on-foot mesh position).
       p.pos.x = p.car.pos.x; p.pos.z = p.car.pos.z;
-      // camera follows the car heading (except while staging screenshots)
       if (!staging) {
         let targetYaw = p.car.heading + Math.PI;
         let dy = targetYaw - this.cameraYaw;
@@ -584,7 +545,6 @@ class Game {
         this.cameraYaw += dy * Math.min(1, dt * 1.2);
       }
       if (input.hit('KeyE')) this.exitCar();
-      // running over a pedestrian = a crime (only while still in the car)
       if (p.car) for (const pd of this.peds) {
         const d = dist2(p.car.pos.x, p.car.pos.z, pd.mesh.position.x, pd.mesh.position.z);
         if (d < 6 && Math.abs(p.car.speed) > 8) {
@@ -598,7 +558,6 @@ class Game {
           break;
         }
       }
-      // hitting a traffic car: slow down + sound (only while still in the car)
       if (p.car) for (const t of this.traffic) {
         const d = dist2(p.car.pos.x, p.car.pos.z, t.car.pos.x, t.car.pos.z);
         if (d < 12) {
@@ -613,7 +572,6 @@ class Game {
       }
     }
 
-    // --- the living world ---
     const allCars = [...this.traffic.map((t) => t.car), ...this.parked, ...this.police.cars];
     for (const t of this.traffic) t.update(dt, allCars);
     const danger = this.combat.weapon !== 'fist' ? { x: p.pos.x, z: p.pos.z } : null;
@@ -629,7 +587,6 @@ class Game {
     this.updateTaxiFare(dt);
     this.combat.update(dt);
 
-    // --- shops / prompts ---
     let prompt = null;
     if (!p.inCar) {
       const car = nearestCar(this.parked, p.pos.x, p.pos.z, 5);
@@ -647,16 +604,13 @@ class Game {
     }
     this.hud.showPrompt(prompt);
 
-    // --- health + armour recover while safe ---
     if (this.police.wanted === 0) {
       if (p.health < GAME.startHealth) p.health = Math.min(GAME.startHealth, p.health + 2 * dt);
       p.armour = regenArmour(p.armour, 0, dt, this.maxArmour);
     }
 
-    // --- respect follows mission progress ---
     this.respect = respectLevel(this.missions.index);
 
-    // --- nearest district (HUD label) ---
     let bestD = Infinity, bestName = 'VELAMAR';
     for (const d of DISTRICTS) {
       const dd = dist2(p.pos.x, p.pos.z, d.x, d.z);
@@ -664,7 +618,6 @@ class Game {
     }
     this.districtName = bestName;
 
-    // --- HUD + minimap ---
     this.hud.setHealth(p.health);
     this.hud.setArmour(p.armour, this.maxArmour);
     this.hud.setMoney(this.money);
@@ -742,7 +695,6 @@ class Game {
         this.hud.showMessage('One thug down!');
       }
     } else if (t.ped) {
-      // punching a pedestrian = a crime
       this.police.addWanted(1, 'punched a civilian');
       this.hud.showMessage('You punched a civilian! Wanted +1 ★');
       t.ped.fleeing = true;
@@ -777,7 +729,6 @@ class Game {
   updateCamera(dt) {
     const p = this.player;
     if (this.topDown) {
-      // Top camera: straight down, north (-z) at the top of the screen, roads parallel to the axes.
       const target = p.inCar ? p.car.pos : p.pos;
       const tx = target.x + this.topDownOffset.x;
       const tz = target.z + this.topDownOffset.z;
@@ -793,26 +744,19 @@ class Game {
     const cx = target.x + Math.sin(this.cameraYaw) * dist * Math.cos(this.cameraPitch);
     const cz = target.z + Math.cos(this.cameraYaw) * dist * Math.cos(this.cameraPitch);
     const cy = ty + Math.sin(this.cameraPitch) * dist + 1.5;
-    // Lateral shift (cameraSide): camera + aim point shift along the camera
-    // right — the car appears shifted left/right in the frame without
-    // changing the view direction.
-    // camLookSide shifts the AIM POINT only — this is what actually moves
-    // the car on screen (used by the win shot so the car is not covered
-    // by the CONTINUE button).
     const fx = -Math.sin(this.cameraYaw), fz = -Math.cos(this.cameraYaw);
     const rx = -fz, rz = fx;
     this.camera.position.set(cx + rx * this.cameraSide, cy, cz + rz * this.cameraSide);
     const lookSide = this.cameraSide + (this.camLookSide || 0);
-    this.camera.lookAt(target.x + rx * lookSide, ty, target.z + rz * lookSide);
+    const ly = this.lookY !== undefined ? this.lookY : ty;
+    this.camera.lookAt(target.x + rx * lookSide, ly, target.z + rz * lookSide);
   }
 }
 
-// ---------- boot ----------
 const { shot } = parseShot();
 const game = new Game(shot);
 window.__game = game;
 if (shot) {
-  // Screenshot mode: skip the start screen, stage the scene deterministically.
   game.sound.enabled = false;
   stageShot(game, shot);
 }

@@ -1,7 +1,3 @@
-// Traffic + pedestrians — AI cars follow the road grid, pedestrians walk the
-// sidewalks. Pedestrians are articulated humans now (head, jacket, arms,
-// legs that walk) with varied hats, skin tones, heights, and backpacks.
-// Simple but alive: they stop for a car ahead, and run scared from danger.
 import * as THREE from 'three';
 import { WORLD, CAR_MODELS } from './config.js';
 import { makeRng, pick, range, clamp } from './random.js';
@@ -11,7 +7,6 @@ import { makeHuman, walkPose } from './human.js';
 const ROADS = [];
 for (let i = -4; i <= 4; i++) ROADS.push(i * WORLD.roadGap);
 
-// One traffic car: drives straight on one road, turns at the city edge.
 export class TrafficCar {
   constructor(scene, rng) {
     const model = pick(rng, CAR_MODELS.filter((m) => m.id !== 'sport'));
@@ -29,7 +24,6 @@ export class TrafficCar {
     this.wait = 0;
   }
   update(dt, others) {
-    // stop if another car is close ahead
     let blocked = false;
     const fx = Math.sin(this.car.heading), fz = Math.cos(this.car.heading);
     for (const o of others) {
@@ -43,14 +37,12 @@ export class TrafficCar {
     else {
       this.car.speed += (this.cruise - this.car.speed) * Math.min(1, dt * 1.5);
       this.car.drive(0, 0, dt);
-      // turn at the edge: reverse onto another road (pick a new road)
       const p = this.car.pos;
       if (Math.abs(p.x) > WORLD.halfSize || Math.abs(p.z) > WORLD.halfSize) {
         this.car.heading += Math.PI;
         this.car.mesh.rotation.y = this.car.heading;
       }
     }
-    // stay on the road: gentle correction back to the road line
     const road = this.horizontal
       ? Math.round(this.car.pos.z / WORLD.roadGap) * WORLD.roadGap + 3.5 * this.dir
       : Math.round(this.car.pos.x / WORLD.roadGap) * WORLD.roadGap + 3.5 * this.dir;
@@ -59,7 +51,6 @@ export class TrafficCar {
   }
 }
 
-// Articulated pedestrian: hat, skin tone, height, and backpack vary.
 const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703];
 const SKIN_TONES = [0xf1c27d, 0x8a5a2b, 0xe8b98a, 0x6b4423, 0xc68642];
 const HAT_COLORS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, 0xf72585];
@@ -77,7 +68,6 @@ export class Pedestrian {
       cap: hat,
       capColor: pick(rng, HAT_COLORS),
     });
-    // backpack (40% of pedestrians)
     if (pack) {
       const bp = new THREE.Mesh(
         new THREE.BoxGeometry(0.4, 0.5, 0.2),
@@ -86,7 +76,6 @@ export class Pedestrian {
       bp.position.set(0, 1.25, -0.26);
       this.mesh.add(bp);
     }
-    // height varies 0.9 – 1.12
     const h = range(rng, 0.9, 1.12);
     this.mesh.scale.set(1, h, 1);
     const x = range(rng, -WORLD.halfSize, WORLD.halfSize);
@@ -96,7 +85,7 @@ export class Pedestrian {
     this.speed = range(rng, 1.2, 2.2);
     this.fleeing = false;
     this.health = 100;
-    this.animT = 0; // simulation clock (NOT performance.now — must stay deterministic)
+    this.animT = 0;
     scene.add(this.mesh);
   }
   newTarget(rng) {
@@ -105,7 +94,6 @@ export class Pedestrian {
   update(dt, rng, danger) {
     this.animT += dt;
     const p = this.mesh.position;
-    // run away from danger (gunfire / a speeding car nearby)
     let tx = this.target.x, tz = this.target.z;
     if (danger && Math.hypot(danger.x - p.x, danger.z - p.z) < 18) {
       tx = p.x + (p.x - danger.x) * 2; tz = p.z + (p.z - danger.z) * 2;
@@ -117,7 +105,6 @@ export class Pedestrian {
     const sp = this.speed * (this.fleeing ? 2.6 : 1);
     p.x += (dx / d) * sp * dt; p.z += (dz / d) * sp * dt;
     this.mesh.rotation.y = Math.atan2(dx, dz);
-    // walk cycle: arms and legs swing (simulation clock — deterministic)
     walkPose(this.mesh, this.animT, this.fleeing ? 1.6 : 1);
   }
 }

@@ -1,12 +1,7 @@
-// Story campaign — the 8-mission story chain "Three Days in Velamar" + side
-// activities. Every mission has an objective, a map target, an optional
-// timer, a reward, and dialog. This system only delivers missions; the
-// complete / fail screens live in the main game.
 import * as THREE from 'three';
 import { MISSIONS, CAR_MODELS, GAME, DIALOGS } from './config.js';
 import { dist2 } from './random.js';
 
-// One dialog line for a mission: { giver, line }.
 export function dialogFor(mission) {
   if (!mission) return null;
   return DIALOGS[mission.id] || null;
@@ -15,19 +10,19 @@ export function dialogFor(mission) {
 export class StoryCampaign {
   constructor(scene, onEvent) {
     this.scene = scene;
-    this.onEvent = onEvent; // (type, data) -> 'complete' | 'fail' | 'start' | 'info'
-    this.index = 0; // active mission (0..7), 8 = all done
-    this.state = 'idle'; // idle | active | done | failed
+    this.onEvent = onEvent;
+    this.index = 0;
+    this.state = 'idle';
     this.timer = 0;
-    this.gates = []; // race gates {x,z,passed,mesh}
+    this.gates = [];
     this.gateIndex = 0;
-    this.taxi = null; // {stage, pickup, drop}
-    this.heistGrabbed = false; // heist: false = heading to the bank, true = running to the pier
+    this.taxi = null;
+    this.heistGrabbed = false;
     this.combatTargets = [];
     this.raceActive = false;
     this.escapeStartWanted = 0;
     this.marker = this.makeMarker();
-    this.animT = 0; // simulation clock (NOT performance.now — must stay deterministic)
+    this.animT = 0;
     scene.add(this.marker);
   }
 
@@ -54,9 +49,6 @@ export class StoryCampaign {
 
   current() { return MISSIONS[this.index] || null; }
 
-  // Mission progress for the HUD card: { stage, total, next }.
-  // Heist = 2 stages (grab the loot → run), race = 4 gates,
-  // the rest 1 stage with the next step from the mission text.
   stageInfo() {
     const m = this.current();
     if (!m) return { stage: 0, total: 8, next: 'All missions complete!' };
@@ -79,8 +71,6 @@ export class StoryCampaign {
     if (m.type === 'escape') {
       return { stage: 1, total: 2, next: 'Lose the heat' };
     }
-    // Single-stage missions: no NEXT line — the objective text already says
-    // what to do, and repeating it in the card is redundant.
     return { stage: 1, total: 1, next: '' };
   }
 
@@ -133,7 +123,7 @@ export class StoryCampaign {
     this.heistGrabbed = false;
     this.marker.visible = false;
     game.money += m.reward;
-    this.index += 1; // advance first so the save records the next mission
+    this.index += 1;
     this.state = 'idle';
     this.onEvent('complete', m);
   }
@@ -146,7 +136,6 @@ export class StoryCampaign {
     this.state = 'idle';
   }
 
-  // Called every frame. game = the main game object (player, police, etc).
   update(dt, game) {
     const m = this.current();
     if (!m || this.state !== 'active') return;
@@ -170,7 +159,6 @@ export class StoryCampaign {
         if (near(m.target.x, m.target.z, 8)) this.complete(game);
         break;
       case 'heist': {
-        // Phase 1: walk in & grab the loot. Phase 2: run for the pier.
         if (!this.heistGrabbed && near(m.target.x, m.target.z, 8)) {
           this.heistGrabbed = true;
           this.onEvent('info', { text: 'Loot secured! Run for the pier!' });
@@ -181,7 +169,6 @@ export class StoryCampaign {
       }
       case 'taxi': {
         if (!this.taxi) {
-          // the fare spawns at the mission target
           this.taxi = { stage: 'pickup', pickup: m.target, drop: { x: -292, z: -240 } };
           game.spawnTaxiPassenger(m.target.x, m.target.z);
         }
@@ -208,7 +195,6 @@ export class StoryCampaign {
       case 'steal': {
         const targetCar = game.stealTarget;
         if (targetCar && game.player.inCar && game.player.car === targetCar) {
-          // bring it to the garage
           this.marker.position.set(-80, 0, -200);
           if (near(-80, -200, 8)) this.complete(game);
         }
@@ -231,8 +217,6 @@ export class StoryCampaign {
   }
 }
 
-// Side activities: on-demand taxi (pick up a random fare, drop them off, get
-// paid) and a quick street race. Called from main.js via the T / R keys.
 export class SideActivities {
   constructor() { this.taxiFare = null; this.raceTimer = 0; }
   startTaxiFare(game) {

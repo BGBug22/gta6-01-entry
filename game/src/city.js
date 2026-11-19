@@ -1,6 +1,3 @@
-// City of VELAMAR — static meshes: roads, buildings, beach, sea, pier,
-// lighthouse, signs, palms, dock yard + crane + ship. Returns { group,
-// colliders }. v5: procedural textures + clouds + sun halo + night mode.
 import * as THREE from 'three';
 import { WORLD, DISTRICTS, PALETTE, ROOF_COLORS, SHOP_SIGNS } from './config.js';
 import { makeRng, pick, range } from './random.js';
@@ -10,7 +7,6 @@ import {
   groundTexture,
 } from './textures.js';
 
-// Sign texture (canvas) — for vertical signage.
 function textTexture(lines, opts = {}) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -31,8 +27,6 @@ function textTexture(lines, opts = {}) {
   return t;
 }
 
-// Ground decal — text painted on the road, readable from a high camera.
-// vertical = text running along the z axis (vertical road).
 function groundDecalTexture(text, sub, color, vertical) {
   const c = document.createElement('canvas');
   c.width = vertical ? 128 : 512;
@@ -73,7 +67,6 @@ function groundDecalTexture(text, sub, color, vertical) {
   return t;
 }
 
-// Crosswalk — white stripes running along the road.
 function crosswalkTexture(horizontal) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = 64;
@@ -103,17 +96,14 @@ export function buildCity(scene, opts = {}) {
   const night = !!opts.night;
   const rng = makeRng(WORLD.seed);
   const group = new THREE.Group();
-  const colliders = []; // {minX,maxX,minZ,maxZ}
+  const colliders = [];
   const H = WORLD.halfSize;
 
-  // --- Sunset sky dome: vertical gradient canvas on a big sphere ---
-  // (BackSide, no fog) so the horizon stays orange from any angle.
   const skyCanvas = document.createElement('canvas');
   skyCanvas.width = 4; skyCanvas.height = 512;
   const sg = skyCanvas.getContext('2d');
   const grad = sg.createLinearGradient(0, 0, 0, 512);
   if (night) {
-    // night: deep blue top, purple mid, dark ember at the horizon
     grad.addColorStop(0.0, '#050518');
     grad.addColorStop(0.20, '#141038');
     grad.addColorStop(0.34, '#3a2050');
@@ -121,7 +111,6 @@ export function buildCity(scene, opts = {}) {
     grad.addColorStop(0.55, '#c06a3a');
     grad.addColorStop(1.0, '#c06a3a');
   } else {
-    // golden hour: deep purple top, pink mid, coral/gold at the horizon
     grad.addColorStop(0.0, '#1c1248');
     grad.addColorStop(0.12, '#4a2f7e');
     grad.addColorStop(0.22, '#a04a8a');
@@ -140,14 +129,13 @@ export function buildCity(scene, opts = {}) {
   scene.add(skyDome);
   scene.background = new THREE.Color(night ? 0x0a0a24 : PALETTE.sky);
 
-  // --- Procedural clouds: soft billboards high in the sky ---
-  // Static positions (seeded) so screenshots stay deterministic.
   const cloudTex = cloudTexture();
   const cloudMat = new THREE.MeshBasicMaterial({
     map: cloudTex, transparent: true, opacity: night ? 0.35 : 0.95,
     side: THREE.DoubleSide, depthWrite: false, fog: false,
   });
   const cloudRng = makeRng(WORLD.seed + 101);
+  const clouds = [];
   for (let i = 0; i < 16; i++) {
     const w = 120 + cloudRng() * 180;
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.42), cloudMat);
@@ -158,11 +146,9 @@ export function buildCity(scene, opts = {}) {
     );
     cloud.rotation.y = Math.PI / 2 + (cloudRng() - 0.5) * 0.6;
     scene.add(cloud);
+    clouds.push(cloud);
   }
 
-  // --- Sun (golden hour): disc + halo bloom + reflection shimmer on the sea ---
-  // Positioned low over the sea (north-west) so it enters the cover frame
-  // from the beach chase camera (yaw ~0.95, looking north-west).
   if (!night) {
     const haloTex = sunTexture();
     const halo = new THREE.Mesh(
@@ -182,7 +168,6 @@ export function buildCity(scene, opts = {}) {
     sunDisc.position.set(-990, 120, -350);
     sunDisc.rotation.y = Math.PI / 2;
     scene.add(sunDisc);
-    // sun reflection: a warm shimmer strip on the sea below the sun
     const reflect = new THREE.Mesh(
       new THREE.PlaneGeometry(90, 260),
       new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.22, depthWrite: false }),
@@ -191,7 +176,6 @@ export function buildCity(scene, opts = {}) {
     reflect.position.set(-380, 0.06, -320);
     group.add(reflect);
   } else {
-    // stars: small white points on the night dome (seeded, deterministic)
     const starRng = makeRng(WORLD.seed + 202);
     const starPos = [];
     for (let i = 0; i < 220; i++) {
@@ -204,7 +188,6 @@ export function buildCity(scene, opts = {}) {
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
     const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 3, sizeAttenuation: false, fog: false }));
     scene.add(stars);
-    // moon: a pale disc high in the east
     const moon = new THREE.Mesh(
       new THREE.CircleGeometry(38, 24),
       new THREE.MeshBasicMaterial({ color: 0xe8ecff, fog: false }),
@@ -214,7 +197,6 @@ export function buildCity(scene, opts = {}) {
     scene.add(moon);
   }
 
-  // --- Fog + lights ---
   scene.fog = new THREE.Fog(night ? 0x1a1a3a : PALETTE.fog, night ? 200 : 250, night ? 800 : 900);
   const sun = new THREE.DirectionalLight(night ? 0x8a9fd8 : 0xffb36b, night ? 1.0 : 2.4);
   sun.position.set(-400, 140, -60);
@@ -224,7 +206,6 @@ export function buildCity(scene, opts = {}) {
   scene.add(fill);
   scene.add(new THREE.HemisphereLight(night ? 0x2a2a5a : 0x8a6fb8, 0x7a5a3a, night ? 0.55 : 0.95));
 
-  // --- City ground (textured) ---
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(H * 2 + 200, H * 2 + 200),
     new THREE.MeshLambertMaterial({ map: groundTexture() }),
@@ -233,7 +214,6 @@ export function buildCity(scene, opts = {}) {
   ground.position.set(40, -0.05, 0);
   group.add(ground);
 
-  // --- Sea (west) with sparkle texture + sand with grain texture ---
   const seaTex = seaTexture();
   seaTex.repeat.set(6, 14);
   const sea = new THREE.Mesh(
@@ -252,7 +232,6 @@ export function buildCity(scene, opts = {}) {
   sand.rotation.x = -Math.PI / 2;
   sand.position.set(WORLD.beachX - 12, 0.03, 0);
   group.add(sand);
-  // foam shoreline: white translucent strip where waves meet the sand
   const foam = new THREE.Mesh(
     new THREE.PlaneGeometry(7, H * 2 + 200),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false }),
@@ -261,7 +240,6 @@ export function buildCity(scene, opts = {}) {
   foam.position.set(WORLD.beachX - 38, 0.05, 0);
   group.add(foam);
 
-  // --- Road grid + sidewalks + center dashes (grainy asphalt texture) ---
   const roadTexH = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexH.repeat.set(40, 1);
   const roadTexV = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexV.repeat.set(1, 40);
   const roadMatH = new THREE.MeshLambertMaterial({ map: roadTexH });
@@ -271,8 +249,6 @@ export function buildCity(scene, opts = {}) {
   const roads = [];
   for (let i = -4; i <= 4; i++) roads.push(i * WORLD.roadGap);
   for (const r of roads) {
-    // roads raised (y 0.10) so they don't z-fight the sidewalks (0.04)
-    // when seen from the low chase camera.
     const hRoad = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 14), roadMatH);
     hRoad.rotation.x = -Math.PI / 2; hRoad.position.set(0, 0.10, r); group.add(hRoad);
     const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(14, H * 2), roadMatV);
@@ -281,7 +257,6 @@ export function buildCity(scene, opts = {}) {
     hWalk.rotation.x = -Math.PI / 2; hWalk.position.set(0, 0.04, r); group.add(hWalk);
     const vWalk = new THREE.Mesh(new THREE.PlaneGeometry(20, H * 2), walkMat);
     vWalk.rotation.x = -Math.PI / 2; vWalk.position.set(r, 0.04, 0); group.add(vWalk);
-    // dashed center lines
     for (let d = -H; d < H; d += 16) {
       const dash = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.7), lineMat);
       dash.rotation.x = -Math.PI / 2; dash.position.set(d, 0.11, r); group.add(dash);
@@ -290,7 +265,6 @@ export function buildCity(scene, opts = {}) {
     }
   }
 
-  // --- Crosswalks at EVERY intersection ---
   const crossV = new THREE.MeshBasicMaterial({ map: crosswalkTexture(false), transparent: true });
   const crossH = new THREE.MeshBasicMaterial({ map: crosswalkTexture(true), transparent: true });
   const crossGeoV = new THREE.PlaneGeometry(14, 9);
@@ -310,9 +284,6 @@ export function buildCity(scene, opts = {}) {
     }
   }
 
-  // --- District name decals on the road (horizontal only) ---
-  // Vertical decals (running down the road) REMOVED: from the low chase
-  // camera they become giant color smears across the road.
   const decals = [
     { text: 'OLD TOWN', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
     { text: 'VELAMAR', sub: 'HARBOR CITY', x: -40, z: 0, vertical: false, color: '#ffd23f' },
@@ -328,8 +299,6 @@ export function buildCity(scene, opts = {}) {
     group.add(m);
   }
 
-  // --- Buildings per block (avoid roads) — Art Deco facades + glass towers
-  // with lit windows + warm tile roofs ---
   const lit = night ? 0.85 : 0.7;
   const facades = [
     artDecoFacade('#ffd9a0', lit, 11),
@@ -341,7 +310,7 @@ export function buildCity(scene, opts = {}) {
   for (let ix = -3; ix <= 3; ix++) for (let iz = -3; iz <= 3; iz++) {
     const cx = ix * WORLD.roadGap + WORLD.roadGap / 2;
     const cz = iz * WORLD.roadGap + WORLD.roadGap / 2;
-    if (cx < WORLD.beachX + 20) continue; // beach / pier area stays open
+    if (cx < WORLD.beachX + 20) continue;
     blockCenters.push({ cx, cz });
   }
   for (const { cx, cz } of blockCenters) {
@@ -359,7 +328,6 @@ export function buildCity(scene, opts = {}) {
       );
       b.position.set(x, h / 2, z);
       group.add(b);
-      // warm tile roof + roof detail (AC / water tank)
       const roofColor = pick(rng, ROOF_COLORS);
       const roof = box(w + 1, 1, d + 1, roofColor, x, h + 0.5, z);
       group.add(roof);
@@ -378,7 +346,6 @@ export function buildCity(scene, opts = {}) {
     }
   }
 
-  // --- Neon signs on building facades (glowing, readable from the road) ---
   const neons = [
     { text: 'VELA BANK', sub: 'VAULT • GLASS DISTRICT', x: 190, y: 14, z: -148, color: '#ffd23f', ry: Math.PI },
     { text: 'HOTEL AZUL', sub: 'ROOMS • SEA VIEW', x: -252, y: 12, z: 168, color: '#4cc9f0', ry: Math.PI / 2 },
@@ -395,9 +362,6 @@ export function buildCity(scene, opts = {}) {
     group.add(sign);
   }
 
-  // --- PALM trees (not round trees) on sidewalks + the beach promenade ---
-  // A palm = a curved trunk (2 segments) + 7 layered drooping fronds in
-  // two greens. Geometry is shared so 100+ palms stay cheap: 9 meshes each.
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
   const leafMat = new THREE.MeshLambertMaterial({ color: 0x2fae5f });
   const leafMat2 = new THREE.MeshLambertMaterial({ color: 0x45c47a });
@@ -406,7 +370,6 @@ export function buildCity(scene, opts = {}) {
   const palmFrondGeo2 = new THREE.BoxGeometry(4.2, 0.12, 1.1);
   function makePalm(x, z, h, lean) {
     const g = new THREE.Group();
-    // curved trunk: lower segment straight, upper segment leaning
     const lower = new THREE.Mesh(palmTrunkGeo, trunkMat);
     lower.scale.y = (h * 0.6) / 8;
     lower.position.y = h * 0.3;
@@ -424,7 +387,7 @@ export function buildCity(scene, opts = {}) {
       holder.rotation.y = (k * Math.PI * 2) / 7 + 0.3;
       const frond = new THREE.Mesh(k % 2 ? palmFrondGeo2 : palmFrondGeo, k % 2 ? leafMat2 : leafMat);
       frond.position.set(2.2, -0.6 - (k % 3) * 0.25, 0);
-      frond.rotation.z = -0.5 - (k % 3) * 0.12; // layered droop
+      frond.rotation.z = -0.5 - (k % 3) * 0.12;
       holder.add(frond);
       g.add(holder);
     }
@@ -437,15 +400,11 @@ export function buildCity(scene, opts = {}) {
     if (rx < WORLD.beachX + 8) continue;
     group.add(makePalm(rx, rz, 7 + (i % 3), (i % 5) * 0.02 - 0.04));
   }
-  // Beach promenade palm row (x=-263, on the sand, every 20 m) — the green
-  // fence of the beach boulevard seen in the cover. Deterministic jitter
-  // from a local lcg (not the city rng) so the city draw order never shifts.
   const pj = lcg(99);
   for (let z = -320; z <= 320; z += 20) {
     group.add(makePalm(-263 + (pj() - 0.5) * 6, z + (pj() - 0.5) * 8, 8, (pj() - 0.5) * 0.08));
   }
 
-  // --- Streetlights along the beach boulevard + main roads ---
   const poleMat = new THREE.MeshLambertMaterial({ color: 0x2b2b2b });
   const glowMat = new THREE.MeshBasicMaterial({ color: night ? 0xffe9a0 : 0xfff2c9, transparent: true, opacity: night ? 1 : 0.7 });
   function streetlight(x, z) {
@@ -464,7 +423,6 @@ export function buildCity(scene, opts = {}) {
     if (z % 80 === 0) group.add(streetlight(12, z));
   }
 
-  // --- Beach: 14 colorful umbrellas + 3 lifeguard towers ---
   const umbrellaColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585];
   for (let i = 0; i < 14; i++) {
     const z = -300 + i * 46;
@@ -492,11 +450,8 @@ export function buildCity(scene, opts = {}) {
     group.add(tower);
   }
 
-  // --- Wooden pier in the north-west + FARO VELA lighthouse (landmark) ---
   const pier = box(16, 1.2, 130, 0x8a6b3d, -292, 0.6, -190);
   group.add(pier);
-  // The pier is NOT a collider: its surface is flat and walkable
-  // (the final mission ends at the end of the pier).
   const tower = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(7, 9, 34, 16),
@@ -504,8 +459,6 @@ export function buildCity(scene, opts = {}) {
   );
   base.position.y = 17; tower.add(base);
   for (let i = 0; i < 3; i++) {
-    // Red bands MUST be wider than the tower radius at that height
-    // (the tower tapers 9 -> 7): otherwise the band sinks inside.
     const band = new THREE.Mesh(
       new THREE.CylinderGeometry(8.6 - i * 0.35, 8.6 - i * 0.35, 4, 16),
       new THREE.MeshLambertMaterial({ color: 0xe63946 }),
@@ -522,8 +475,6 @@ export function buildCity(scene, opts = {}) {
     new THREE.MeshLambertMaterial({ color: 0xe63946 }),
   );
   cap.position.y = 41; tower.add(cap);
-  // lighthouse beam (translucent cone) — points WEST, over the sea
-  // (not east into the city).
   const beam = new THREE.Mesh(
     new THREE.ConeGeometry(9, 60, 12, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xfff2c9, transparent: true, opacity: night ? 0.3 : 0.16, side: THREE.DoubleSide }),
@@ -533,7 +484,6 @@ export function buildCity(scene, opts = {}) {
   tower.position.set(-292, 1, -252);
   group.add(tower);
 
-  // small boat at the pier (final mission destination)
   const boat = new THREE.Group();
   const hull = box(6, 2.4, 16, 0xf4f4f4, 0, 1.2, 0);
   const cabin = box(4, 2.4, 5, 0x4361ee, 0, 3.4, -2);
@@ -541,7 +491,6 @@ export function buildCity(scene, opts = {}) {
   boat.position.set(-310, 0.4, -200);
   group.add(boat);
 
-  // --- Puerto Vela Docks: container yard + crane + cargo ship ---
   const dockX = -252, dockZ = -140;
   const contCols = ['#c8342c', '#e07b2a', '#2a5fc8'];
   const contMats = contCols.map((c, i) => new THREE.MeshLambertMaterial({ map: containerTexture(c, 20 + i) }));
@@ -559,7 +508,6 @@ export function buildCity(scene, opts = {}) {
     group.add(c);
     colliders.push({ minX: s.x - 6, maxX: s.x + 6, minZ: s.z - 2, maxZ: s.z + 2 });
   });
-  // dock crane: tower + jib + cable + hook
   const crane = new THREE.Group();
   const craneMat = new THREE.MeshLambertMaterial({ color: 0xffd23f });
   const craneTower = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 3), craneMat);
@@ -574,10 +522,8 @@ export function buildCity(scene, opts = {}) {
   const hook = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4),
     new THREE.MeshLambertMaterial({ color: 0x333333 }));
   hook.position.set(20, 11, 0); crane.add(hook);
-  // West end of the dock, by the pier — clear of the cover camera's view.
   crane.position.set(dockX - 16, 0, dockZ + 0);
   group.add(crane);
-  // cargo ship moored at the dock
   const cargo = new THREE.Group();
   cargo.add(box(14, 4, 46, 0x1b263b, 0, 2, 0));
   cargo.add(box(10, 3, 8, 0xe63946, 0, 5.5, -14));
@@ -587,7 +533,6 @@ export function buildCity(scene, opts = {}) {
   cargo.rotation.y = 0.15;
   group.add(cargo);
 
-  // --- Ferris wheel at the north end of the beach (second landmark, seen from the beach road) ---
   const wheel = new THREE.Group();
   const wheelWhite = new THREE.MeshLambertMaterial({ color: 0xf4f4f4 });
   for (const s of [-1, 1]) {
@@ -625,12 +570,10 @@ export function buildCity(scene, opts = {}) {
   hub.rotation.x = Math.PI / 2;
   hub.position.y = 30;
   wheel.add(hub);
-  // The wheel faces east (toward the beach road) so it reads as a full circle from the chase camera.
   wheel.rotation.y = Math.PI / 2;
   wheel.position.set(-284, 0, -300);
   group.add(wheel);
 
-  // --- 4 ships in the sea (the sea must not be empty from the chase camera) ---
   const shipSpots = [
     { x: -360, z: -260, c: 0xe63946 }, { x: -385, z: -60, c: 0x4cc9f0 },
     { x: -350, z: 120, c: 0xffd23f }, { x: -395, z: 240, c: 0x7ee081 },
@@ -650,7 +593,6 @@ export function buildCity(scene, opts = {}) {
     group.add(ship);
   }
 
-  // --- District name signs (big signage, readable from far away) ---
   for (const d of DISTRICTS) {
     const tex = textTexture([d.name, d.sub], { color: d.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -660,7 +602,6 @@ export function buildCity(scene, opts = {}) {
     sign.position.set(d.x, d.big ? 26 : 20, d.z);
     sign.rotation.y = d.ry !== undefined ? d.ry : Math.PI / 4;
     group.add(sign);
-    // support pole
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.6, 0.6, d.big ? 16 : 12, 8),
       new THREE.MeshLambertMaterial({ color: 0x333333 }),
@@ -669,10 +610,6 @@ export function buildCity(scene, opts = {}) {
     group.add(pole);
   }
 
-  // --- Shop signs (small signs on the sidewalk near each shop) ---
-  // Size 12x5 at y=4 (eye level) — a 20x10 sign at y=12 is too high:
-  // from the third-person camera looking down at the player, a sign that
-  // high falls ABOVE the frame edge and is never seen at all.
   for (const s of SHOP_SIGNS) {
     const tex = textTexture([s.name, s.sub], { color: s.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -690,9 +627,6 @@ export function buildCity(scene, opts = {}) {
     group.add(pole);
   }
 
-  // --- Plaza Mercado: paved plaza + a fountain with a spout ---
-  // Grainy stone paving (sand texture tinted stone) + a cafe set so the
-  // plaza reads as a lively paved square, not a plain floor.
   const plaza = new THREE.Mesh(
     new THREE.CircleGeometry(34, 24),
     new THREE.MeshLambertMaterial({ map: sandTexture(), color: 0xd8cbb0 }),
@@ -725,7 +659,6 @@ export function buildCity(scene, opts = {}) {
   );
   spoutTop.position.set(60, 3.8, 140);
   group.add(spoutTop);
-  // Cafe set: 3 umbrellas + benches + 2 palms around the plaza edge.
   for (const [ux, uz, uc] of [[38, 118, 0xe63946], [82, 162, 0xffd23f], [40, 162, 0x4cc9f0]]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }));
     pole.position.set(ux, 1.5, uz); group.add(pole);
@@ -736,10 +669,9 @@ export function buildCity(scene, opts = {}) {
   group.add(makePalm(34, 120, 8, 0.02), makePalm(86, 118, 7, -0.02));
 
   scene.add(group);
-  return { group, colliders };
+  return { group, colliders, clouds, roadMats: [roadMatH, roadMatV] };
 }
 
-// Push a position (circle radius r) out of building AABBs.
 export function resolveColliders(pos, r, colliders) {
   for (const c of colliders) {
     if (pos.x > c.minX - r && pos.x < c.maxX + r && pos.z > c.minZ - r && pos.z < c.maxZ + r) {

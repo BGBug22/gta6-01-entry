@@ -1,7 +1,3 @@
-// VELAMAR v5 — articulated human character (player, pedestrians, enemies, cops).
-// A real person, not a capsule: head + hair/glasses, jacket torso, two arms
-// that hold a weapon, two legs that walk. All parts are named in userData so
-// the walk/aim animation can swing them from the simulation clock (deterministic).
 import * as THREE from 'three';
 
 function lam(color, opts = {}) {
@@ -12,7 +8,6 @@ function box(w, h, d, mat) {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 }
 
-// Small gun mesh for the hands: pistol / micro-SMG / shotgun.
 export function makeWeaponMesh(kind) {
   const g = new THREE.Group();
   const dark = lam(0x1a1a22);
@@ -37,8 +32,6 @@ export function makeWeaponMesh(kind) {
   return g;
 }
 
-// Build one articulated human. Returns a THREE.Group; parts live in
-// group.userData.parts = { head, torso, armL, armR, legL, legR, weapon }.
 export function makeHuman(o = {}) {
   const skin = o.skin ?? 0xf1c27d;
   const jacket = o.jacket ?? 0x2a9d8f;
@@ -47,7 +40,6 @@ export function makeHuman(o = {}) {
   const g = new THREE.Group();
   const parts = {};
 
-  // legs — groups pivoted at the hip (y 0.95), thigh + shin + shoe
   function makeLeg(side) {
     const hip = new THREE.Group();
     hip.position.set(side * 0.14, 0.95, 0);
@@ -63,7 +55,6 @@ export function makeHuman(o = {}) {
   parts.legL = makeLeg(-1);
   parts.legR = makeLeg(1);
 
-  // torso — jacket (box, slightly tapered by a second chest box)
   const torso = new THREE.Group();
   torso.position.y = 0.95;
   const chest = box(0.56, 0.52, 0.32, lam(jacket));
@@ -73,7 +64,6 @@ export function makeHuman(o = {}) {
   g.add(torso);
   parts.torso = torso;
 
-  // arms — groups pivoted at the shoulder, upper arm + forearm + hand
   function makeArm(side) {
     const shoulder = new THREE.Group();
     shoulder.position.set(side * 0.33, 1.42, 0);
@@ -89,7 +79,6 @@ export function makeHuman(o = {}) {
   parts.armL = makeArm(-1);
   parts.armR = makeArm(1);
 
-  // head — sphere + hair cap + optional glasses / cap / band
   const head = new THREE.Group();
   head.position.y = 1.68;
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), lam(skin));
@@ -121,7 +110,6 @@ export function makeHuman(o = {}) {
   g.add(head);
   parts.head = head;
 
-  // weapon in the right hand (hidden until aimed)
   parts.weapon = null;
   parts.weaponKind = o.weapon || null;
   if (o.weapon) {
@@ -131,7 +119,6 @@ export function makeHuman(o = {}) {
     parts.weapon = w;
   }
 
-  // ground ring under the player (only when asked) — marks the hero.
   if (o.ring) {
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.55, 0.75, 24),
@@ -145,8 +132,6 @@ export function makeHuman(o = {}) {
   return g;
 }
 
-// Walk cycle: arms and legs swing opposite, driven by the simulation clock.
-// t = seconds of simulated time (NOT performance.now — deterministic).
 export function walkPose(human, t, speed = 1) {
   const p = human.userData.parts;
   if (!p) return;
@@ -159,7 +144,6 @@ export function walkPose(human, t, speed = 1) {
   p.armR.rotation.z = -0.08;
 }
 
-// Aim: both arms forward, weapon level, legs braced.
 export function aimPose(human) {
   const p = human.userData.parts;
   if (!p) return;
@@ -171,7 +155,6 @@ export function aimPose(human) {
   p.legR.rotation.x = -0.22;
 }
 
-// Idle: arms relaxed at the sides.
 export function idlePose(human) {
   const p = human.userData.parts;
   if (!p) return;
@@ -180,7 +163,6 @@ export function idlePose(human) {
   p.legL.rotation.x = 0; p.legR.rotation.x = 0;
 }
 
-// Swap the weapon in the right hand (returns the new mesh).
 export function setWeapon(human, kind) {
   const p = human.userData.parts;
   if (!p) return null;

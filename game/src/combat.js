@@ -1,6 +1,3 @@
-// Combat — punches (F) + 4 weapons (1-4: Fists, Pistol, Micro-SMG, Shotgun).
-// Dock enemies (mission 7): articulated thugs who shoot back. Muzzle
-// flash + bullet tracers included.
 import * as THREE from 'three';
 import { WEAPONS, WORLD } from './config.js';
 import { makeHuman, aimPose } from './human.js';
@@ -9,7 +6,7 @@ import { makeRng } from './random.js';
 export class Combat {
   constructor(scene) {
     this.scene = scene;
-    this.weapon = 'fist'; // fist | pistol | smg | shotgun
+    this.weapon = 'fist';
     this.ammo = { pistol: 0, smg: 0, shotgun: 0 };
     this.owned = { pistol: false, smg: false, shotgun: false };
     this.cooldown = 0;
@@ -38,7 +35,6 @@ export class Combat {
       if (this.flashTimer <= 0) { this.scene.remove(this.flash); this.flash = null; }
     }
   }
-  // Punch: an enemy / pedestrian within 2.4 m in front of the player.
   punch(player, targets, onHit) {
     if (this.cooldown > 0) return false;
     this.cooldown = WEAPONS.fist.rate;
@@ -50,8 +46,6 @@ export class Combat {
     }
     return false;
   }
-  // Shoot: raycast to the nearest target in the camera direction.
-  // Shotgun fires 5 pellets with spread; SMG is fast with a wider cone.
   shoot(player, camera, targets, onHit) {
     const w = WEAPONS[this.weapon];
     if (!w || this.weapon === 'fist') return 'no-weapon';
@@ -66,7 +60,6 @@ export class Combat {
     const pellets = w.pellets || 1;
     let hits = 0;
     for (let k = 0; k < pellets; k++) {
-      // deterministic spread in shot mode: pellets fan out by index, not random
       const spread = w.spread * (pellets === 1 ? 0 : (k - (pellets - 1) / 2) / ((pellets - 1) / 2));
       const d = dir.clone();
       d.x += spread * 0.6; d.y += spread * 0.3; d.normalize();
@@ -80,7 +73,6 @@ export class Combat {
       }
       if (best) { onHit(best, w.damage); hits += 1; }
     }
-    // bright tracer line + muzzle flash at the camera
     this.showTracer(origin, dir, 40);
     this.showMuzzle(origin, dir);
     return hits > 0 ? 'hit' : 'miss';
@@ -93,7 +85,6 @@ export class Combat {
     this.scene.add(this.tracer);
     setTimeout(() => { if (this.tracer) { this.scene.remove(this.tracer); this.tracer = null; } }, 70);
   }
-  // Muzzle flash: a bright star at the muzzle, fading fast.
   showMuzzle(origin, dir) {
     if (this.flash) this.scene.remove(this.flash);
     const g = new THREE.Group();
@@ -117,7 +108,6 @@ export class Combat {
     this.flash = g;
     this.flashTimer = 0.09;
   }
-  // Static muzzle flash for screenshot staging (deterministic — no timer).
   staticFlash(pos, dir) {
     const g = new THREE.Group();
     const core = new THREE.Mesh(
@@ -141,7 +131,6 @@ export class Combat {
   }
 }
 
-// Dock thug (mission 7) — an articulated human in a red jacket who shoots back.
 export class Enemy {
   constructor(scene, x, z, seed = 0) {
     this.mesh = makeHuman({
@@ -170,7 +159,6 @@ export class Enemy {
       this.pos.x += (dx / d) * 3.2 * dt; this.pos.z += (dz / d) * 3.2 * dt;
     }
     this.mesh.rotation.y = Math.atan2(dx, dz);
-    // aim while close
     aimPose(this.mesh);
     this.shootCd -= dt;
     if (d < 26 && this.shootCd <= 0) {

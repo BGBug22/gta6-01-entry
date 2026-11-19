@@ -1,12 +1,10 @@
-// Input keyboard + mouse. Drag mouse = putar kamera; klik canvas = pointer lock
-// (optional, drag still works without lock for easy play).
 export class Input {
   constructor(canvas) {
     this.keys = {};
     this.mouseDX = 0; this.mouseDY = 0;
     this.mouseDown = false;
-    this.clicked = false; // klik kiri sekali (tembak)
-    this.pressed = {}; // tombol yang baru ditekan frame ini
+    this.clicked = false;
+    this.pressed = {};
     this.canvas = canvas;
     this.dragging = false;
     this.lastX = 0; this.lastY = 0;
@@ -24,7 +22,7 @@ export class Input {
       this.mouseDown = true; this.dragging = true;
       this.lastX = e.clientX; this.lastY = e.clientY;
       if (e.button === 0) this.clicked = true;
-      try { canvas.requestPointerLock?.(); } catch { /* abaikan */ }
+      try { canvas.requestPointerLock?.(); } catch {  }
     });
     window.addEventListener('mouseup', () => { this.mouseDown = false; this.dragging = false; });
     window.addEventListener('mousemove', (e) => {
@@ -39,7 +37,6 @@ export class Input {
 
   down(code) { return !!this.keys[code]; }
   hit(code) { return !!this.pressed[code]; }
-  // WASD atau panah — mengembalikan vektor gerak -1..1
   moveVector() {
     let x = 0, z = 0;
     if (this.down('KeyW') || this.down('ArrowUp')) z -= 1;

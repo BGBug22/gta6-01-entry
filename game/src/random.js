@@ -1,5 +1,3 @@
-// RNG deterministik (mulberry32) — kota, lalu lintas, dan shot screenshot
-// selalu sama untuk seed yang sama, supaya screenshot bisa diulang persis.
 export function makeRng(seed) {
   let a = seed >>> 0;
   return function rng() {

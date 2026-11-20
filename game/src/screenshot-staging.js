@@ -1,25 +1,20 @@
 import * as THREE from 'three';
 import { CAR_MODELS, DIALOGS } from './config.js';
-
 export function parseShot() {
   const q = new URLSearchParams(location.search);
   return { shot: q.get('shot') || null, seed: Number(q.get('seed') || 1) };
 }
-
 function placeTrafficCar(tc, x, z, heading) {
   tc.car.pos.x = x; tc.car.pos.z = z;
   tc.car.heading = heading; tc.car.mesh.rotation.y = heading;
 }
-
 function placePed(pd, x, z) {
   pd.mesh.position.set(x, 0, z);
 }
-
 function placeEnemy(e, x, z) {
   e.mesh.position.set(x, 0, z);
   e.pos = e.mesh.position;
 }
-
 function pinHelicopter(game, fwd, left, height) {
   const p = game.police;
   if (!p.heli) return;
@@ -34,7 +29,6 @@ function pinHelicopter(game, fwd, left, height) {
   const pz = cz + hz * fwd + lz * left;
   p.placeHelicopter(px, height, pz, Math.atan2(cx - px, cz - pz));
 }
-
 export function stageShot(game, shot) {
   const g = game;
   g.shotMode = shot;
@@ -47,7 +41,6 @@ export function stageShot(game, shot) {
     car.mesh.rotation.y = heading; car.speed = speed || 0;
   };
   g.clockDay = 1; g.clockMin = 18 * 60 + 24;
-
   if (shot === 'cover') {
     const sport = CAR_MODELS.find((m) => m.id === 'sport');
     g.enterCar(g.playerCar(sport, -240, -200, Math.PI));
@@ -176,8 +169,37 @@ export function stageShot(game, shot) {
   }
   for (let i = 0; i < 20; i++) g.stepWorld(1 / 60, true);
   if (shot === 'cover') {
-    pinHelicopter(g, 75, 15, 30);
-    if (g.police.heli) g.police.heli.mesh.traverse((o) => { if (o.geometry && o.geometry.type === 'ConeGeometry') { o.material.opacity = 0.28; o.scale.set(0.55, 1, 0.55); } });
+    pinHelicopter(g, 75, -4, 26);
+    const H = g.police.heli, pp = g.player.car.pos;
+    const M = (m, c, o) => new THREE.MeshBasicMaterial({ map: m, color: c, transparent: true, opacity: o || 1, blending: THREE.AdditiveBlending, depthWrite: false });
+    if (H) {
+      const hp = H.mesh.position;
+      H.mesh.traverse((o) => { if (o.geometry && o.geometry.type === 'ConeGeometry') o.visible = false; });
+      const bc = document.createElement('canvas'); bc.width = 16; bc.height = 256;
+      const bx = bc.getContext('2d'), bg = bx.createLinearGradient(0, 0, 0, 256);
+      bg.addColorStop(0, '#fff2c940'); bg.addColorStop(1, '#fff2c90d');
+      bx.fillStyle = bg; bx.fillRect(0, 0, 16, 256);
+      const ft = new THREE.Vector3(pp.x + 2, .3, pp.z - 30);
+      const bd = hp.clone().sub(ft), bl = bd.length();
+      const bm = new THREE.Mesh(new THREE.ConeGeometry(5, bl, 16, 1, true), M(new THREE.CanvasTexture(bc), 0xffffff));
+      bm.position.copy(hp).add(ft).multiplyScalar(.5);
+      bm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bd.normalize());
+      g.scene.add(bm);
+      const rc = document.createElement('canvas'); rc.width = rc.height = 128;
+      const rx = rc.getContext('2d'), rg = rx.createRadialGradient(64, 64, 4, 64, 64, 64);
+      rg.addColorStop(0, '#ffffffE6'); rg.addColorStop(1, '#ffffff00');
+      rx.fillStyle = rg; rx.fillRect(0, 0, 128, 128);
+      const rt = new THREE.CanvasTexture(rc);
+      const pool = (x, z, r, c, o) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 20), M(rt, c, o)); m.rotation.x = -Math.PI / 2; m.position.set(x, .06, z); g.scene.add(m); };
+      pool(ft.x, ft.z, 8, 0xffe9a0, .6);
+      g.police.cars.forEach((pc, i) => { pool(pc.pos.x, pc.pos.z, 6, i % 2 ? 0x2244ff : 0xff2222, .6); if (i === 1 || i === 2) { pc.heading += i === 1 ? .4 : -.4; pc.mesh.rotation.y = pc.heading; } });
+    }
+    g.scene.traverse((o) => { if (o.material?.side === THREE.BackSide && o.material?.map) { const cv = o.material.map.image, x = cv.getContext('2d'), gr = x.createLinearGradient(0, 200, 0, 512); gr.addColorStop(0, '#ff8a3d'); gr.addColorStop(.4, '#F2A65A'); gr.addColorStop(1, '#E07A40'); x.fillStyle = gr; x.fillRect(0, 200, 4, 312); o.material.map.needsUpdate = true; } });
+    g.scene.traverse((o) => { if (o.geometry?.parameters?.height === 8) { const p = o.parent; if (p && !p.userData.f && p.position.x < -255 && p.position.z > -225 && p.position.z < -160) { p.userData.f = 1; p.position.z -= 22; p.scale.setScalar(.88); } } });
+    for (const [x, z, w, h, c] of [[-145, -320, 22, 16, 0x8a5a3b], [-118, -340, 18, 20, 0x6b4a5a]]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshLambertMaterial({ color: c }));
+      b.position.set(x, h / 2, z); g.scene.add(b);
+    }
   }
   if (shot === 'heist-night') pinHelicopter(g, 60, 15, 20);
   if (shot === 'combat-dock') {
@@ -255,7 +277,7 @@ export function stageShot(game, shot) {
   else if (shot === 'heist-night') g.hud.showMessage('🚧 ROADBLOCK AHEAD', 999);
   else if (shot === 'combat-dock') g.hud.showMessage('⚠️ THUGS OPEN FIRE', 999);
   else if (shot === 'plaza-shop') g.hud.showMessage('🏆 MISSION PASSED! +$5,000', 999);
-  if (shot === 'plaza-shop') g.hud.showPrompt(null);
+  if (shot === 'plaza-shop' || shot === 'cover') g.hud.showPrompt(null);
   g.frozen = true;
   g.renderOnce();
   window.__VELAMAR_READY__ = true;

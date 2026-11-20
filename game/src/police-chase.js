@@ -6,9 +6,7 @@ import { makeHuman, walkPose } from './human.js';
 import {
   policeCarCount, policeFootCount, helicopterWanted, decayWanted,
 } from './wanted-level.js';
-
 export const POLICE_MODEL = { id: 'police', name: 'Vela Patrol', color: 0x111111, speed: 40, accel: 20, price: 0 };
-
 function makeFootCop() {
   const m = makeHuman({
     skin: 0xf1c27d,
@@ -20,7 +18,6 @@ function makeFootCop() {
   });
   return m;
 }
-
 function makeHelicopter() {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2, 8),
@@ -67,7 +64,6 @@ function makeHelicopter() {
   g.userData.beam = beam;
   return g;
 }
-
 export class PoliceChase {
   constructor(scene) {
     this.scene = scene;
@@ -80,16 +76,13 @@ export class PoliceChase {
     this.bustedTimer = 0;
     this.flashT = 0;
   }
-
   addWanted(n, reason) {
     this.wanted = clamp(this.wanted + n, 0, GAME.maxWanted);
     this.heat = 1;
     return reason;
   }
-
   policeCount() { return policeCarCount(this.wanted); }
   footCount() { return policeFootCount(this.wanted); }
-
   ensureUnits(playerPos) {
     const want = policeCarCount(this.wanted);
     while (this.cars.length < want) {
@@ -108,7 +101,6 @@ export class PoliceChase {
       this.foot.push({ mesh: m, speed: 4.2, animT: this.rng() * 10 });
     }
   }
-
   ensureHelicopter(playerPos) {
     if (!helicopterWanted(this.wanted)) {
       if (this.heli) { this.scene.remove(this.heli.mesh); this.heli = null; }
@@ -121,13 +113,11 @@ export class PoliceChase {
       this.heli = { mesh, angle: 0 };
     }
   }
-
   placeHelicopter(x, y, z, rotY) {
     if (!this.heli) return;
     this.heli.mesh.position.set(x, y, z);
     this.heli.mesh.rotation.y = rotY;
   }
-
   units(playerPos) {
     const rows = [];
     const names = ['VELA-11', 'AZUL-25', 'MARLIN-18', 'FARO-2', 'CORAL-7'];
@@ -142,12 +132,10 @@ export class PoliceChase {
     });
     return rows;
   }
-
   removeUnit(list, i) {
     this.scene.remove(list[i].mesh || list[i].car?.mesh);
     list.splice(i, 1);
   }
-
   update(dt, player) {
     this.flashT += dt;
     const decayed = decayWanted(this.wanted, this.heat, dt);
@@ -157,7 +145,6 @@ export class PoliceChase {
     this.ensureHelicopter(player.pos);
     while (this.cars.length > policeCarCount(this.wanted)) this.removeUnit(this.cars, this.cars.length - 1);
     while (this.foot.length > policeFootCount(this.wanted)) this.removeUnit(this.foot, this.foot.length - 1);
-
     const px = player.pos.x, pz = player.pos.z;
     for (const pc of this.cars) {
       const dx = px - pc.pos.x, dz = pz - pc.pos.z;
@@ -215,7 +202,6 @@ export class PoliceChase {
     } else this.bustedTimer = 0;
     return null;
   }
-
   clearAll() {
     for (const c of this.cars) this.scene.remove(c.mesh);
     for (const f of this.foot) this.scene.remove(f.mesh);

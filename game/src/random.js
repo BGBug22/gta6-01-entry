@@ -7,10 +7,8 @@ export function makeRng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
 export function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 export function range(rng, min, max) { return min + rng() * (max - min); }
 export function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
-export function lerp(a, b, t) { return a + (b - a) * t; }
 export function dist2(ax, az, bx, bz) { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; }
 export function angleTo(ax, az, bx, bz) { return Math.atan2(bx - ax, bz - az); }

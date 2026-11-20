@@ -1,5 +1,4 @@
 import { wantedLabel } from './wanted-level.js';
-
 export class Hud {
   constructor() {
     this.el = {};

@@ -1,5 +1,4 @@
 import { WORLD } from './config.js';
-
 export class Minimap {
   constructor(canvas) {
     this.c = canvas;

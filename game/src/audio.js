@@ -1,11 +1,9 @@
 import { RADIO } from './config.js';
-
 const STATIONS = [
   { lead: [220, 261.6, 329.6, 440, 329.6, 261.6, 220, 196], bass: [110, 110, 130.8, 164.8], step: 190, leadWave: 'square', bassWave: 'sawtooth', vol: 0.035 },
   { lead: [261.6, 329.6, 392, 493.9, 392, 329.6, 261.6, 220], bass: [130.8, 164.8, 196, 246.9], step: 320, leadWave: 'sine', bassWave: 'sine', vol: 0.03 },
   { lead: [146.8, 174.6, 220, 261.6, 220, 174.6, 146.8, 130.8], bass: [73.4, 73.4, 87.3, 110], step: 260, leadWave: 'triangle', bassWave: 'sawtooth', vol: 0.032 },
 ];
-
 export class SoundBank {
   constructor() {
     this.ctx = null;

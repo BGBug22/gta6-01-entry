@@ -3,10 +3,8 @@ import { WORLD, CAR_MODELS } from './config.js';
 import { makeRng, pick, range, clamp } from './random.js';
 import { Car } from './vehicles.js';
 import { makeHuman, walkPose } from './human.js';
-
 const ROADS = [];
 for (let i = -4; i <= 4; i++) ROADS.push(i * WORLD.roadGap);
-
 export class TrafficCar {
   constructor(scene, rng) {
     const model = pick(rng, CAR_MODELS.filter((m) => m.id !== 'sport'));
@@ -50,7 +48,6 @@ export class TrafficCar {
     else this.car.pos.x += clamp(road - this.car.pos.x, -1, 1) * dt * 2;
   }
 }
-
 const PED_COLORS = [0xff8fa3, 0x90dbf4, 0xffe66d, 0x95d5b2, 0xf7aef8, 0xcaf0f8, 0xffb703];
 const SKIN_TONES = [0xf1c27d, 0x8a5a2b, 0xe8b98a, 0x6b4423, 0xc68642];
 const HAT_COLORS = [0xffd23f, 0xe63946, 0x4361ee, 0x2a9d8f, 0xffffff, 0xf72585];
@@ -108,7 +105,6 @@ export class Pedestrian {
     walkPose(this.mesh, this.animT, this.fleeing ? 1.6 : 1);
   }
 }
-
 export function spawnTraffic(scene, count) {
   const rng = makeRng(WORLD.seed + 7);
   const list = [];

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-
 export function lcg(seed) {
   let a = seed >>> 0;
   return () => {
@@ -9,13 +8,11 @@ export function lcg(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
 function canvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   return [c, c.getContext('2d')];
 }
-
 function toTex(c, repeat) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -25,7 +22,6 @@ function toTex(c, repeat) {
   }
   return t;
 }
-
 export function asphaltTexture(seed = 5, base = '#3a4150') {
   const [c, g] = canvas(256, 256);
   const r = lcg(seed);
@@ -46,17 +42,6 @@ export function asphaltTexture(seed = 5, base = '#3a4150') {
   g.fillRect(230, 0, 6, 256);
   return toTex(c, [10, 10]);
 }
-
-export function roadMarkTexture() {
-  const [c, g] = canvas(256, 64);
-  g.clearRect(0, 0, 256, 64);
-  g.fillStyle = '#ffd23f';
-  g.fillRect(0, 28, 256, 8);
-  g.fillStyle = '#f5f0dc';
-  g.fillRect(0, 2, 256, 3); g.fillRect(0, 59, 256, 3);
-  return toTex(c);
-}
-
 export function artDecoFacade(wall, lit, seed) {
   const [c, g] = canvas(128, 256);
   const r = lcg(seed);
@@ -78,7 +63,6 @@ export function artDecoFacade(wall, lit, seed) {
   g.fillStyle = '#ff5d8f'; g.fillRect(0, 0, 128, 4);
   return toTex(c);
 }
-
 export function glassTowerTexture(seed) {
   const [c, g] = canvas(128, 256);
   const r = lcg(seed);
@@ -95,7 +79,6 @@ export function glassTowerTexture(seed) {
   for (let x = 0; x < 128; x += 20) g.fillRect(x, 0, 1, 256);
   return toTex(c);
 }
-
 export function neonSignTexture(lines, color, bg = '#0d1526') {
   const [c, g] = canvas(512, 256);
   g.fillStyle = bg; g.fillRect(0, 0, 512, 256);
@@ -115,7 +98,6 @@ export function neonSignTexture(lines, color, bg = '#0d1526') {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 export function containerTexture(color, seed) {
   const [c, g] = canvas(256, 128);
   const r = lcg(seed);
@@ -134,7 +116,6 @@ export function containerTexture(color, seed) {
   g.fillText('VELA LINE', 128, 72);
   return toTex(c);
 }
-
 export function sandTexture(seed = 9) {
   const [c, g] = canvas(256, 256);
   const r = lcg(seed);
@@ -147,7 +128,6 @@ export function sandTexture(seed = 9) {
   }
   return toTex(c, [12, 12]);
 }
-
 export function seaTexture(seed = 11) {
   const [c, g] = canvas(256, 256);
   const r = lcg(seed);
@@ -168,7 +148,6 @@ export function seaTexture(seed = 11) {
   }
   return toTex(c, [6, 6]);
 }
-
 export function sunTexture() {
   const [c, g] = canvas(256, 256);
   const grad = g.createRadialGradient(128, 128, 8, 128, 128, 128);
@@ -181,7 +160,6 @@ export function sunTexture() {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 export function cloudTexture(seed = 13) {
   const [c, g] = canvas(512, 256);
   const r = lcg(seed);
@@ -199,7 +177,6 @@ export function cloudTexture(seed = 13) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 export function groundTexture(seed = 7) {
   const [c, g] = canvas(256, 256);
   const r = lcg(seed);

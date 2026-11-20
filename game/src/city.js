@@ -6,7 +6,6 @@ import {
   containerTexture, sandTexture, seaTexture, sunTexture, cloudTexture,
   groundTexture,
 } from './textures.js';
-
 function textTexture(lines, opts = {}) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -26,7 +25,6 @@ function textTexture(lines, opts = {}) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 function groundDecalTexture(text, sub, color, vertical) {
   const c = document.createElement('canvas');
   c.width = vertical ? 128 : 512;
@@ -66,7 +64,6 @@ function groundDecalTexture(text, sub, color, vertical) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 function crosswalkTexture(horizontal) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = 64;
@@ -81,7 +78,6 @@ function crosswalkTexture(horizontal) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-
 function box(w, h, d, color, x, y, z, opts = {}) {
   const m = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -91,14 +87,12 @@ function box(w, h, d, color, x, y, z, opts = {}) {
   if (opts.ry) m.rotation.y = opts.ry;
   return m;
 }
-
 export function buildCity(scene, opts = {}) {
   const night = !!opts.night;
   const rng = makeRng(WORLD.seed);
   const group = new THREE.Group();
   const colliders = [];
   const H = WORLD.halfSize;
-
   const skyCanvas = document.createElement('canvas');
   skyCanvas.width = 4; skyCanvas.height = 512;
   const sg = skyCanvas.getContext('2d');
@@ -128,7 +122,6 @@ export function buildCity(scene, opts = {}) {
   );
   scene.add(skyDome);
   scene.background = new THREE.Color(night ? 0x0a0a24 : PALETTE.sky);
-
   const cloudTex = cloudTexture();
   const cloudMat = new THREE.MeshBasicMaterial({
     map: cloudTex, transparent: true, opacity: night ? 0.35 : 0.95,
@@ -148,7 +141,6 @@ export function buildCity(scene, opts = {}) {
     scene.add(cloud);
     clouds.push(cloud);
   }
-
   if (!night) {
     const haloTex = sunTexture();
     const halo = new THREE.Mesh(
@@ -196,7 +188,6 @@ export function buildCity(scene, opts = {}) {
     moon.rotation.y = -Math.PI / 2;
     scene.add(moon);
   }
-
   scene.fog = new THREE.Fog(night ? 0x1a1a3a : PALETTE.fog, night ? 200 : 250, night ? 800 : 900);
   const sun = new THREE.DirectionalLight(night ? 0x8a9fd8 : 0xffb36b, night ? 1.0 : 2.4);
   sun.position.set(-400, 140, -60);
@@ -205,7 +196,6 @@ export function buildCity(scene, opts = {}) {
   fill.position.set(300, 160, 300);
   scene.add(fill);
   scene.add(new THREE.HemisphereLight(night ? 0x2a2a5a : 0x8a6fb8, 0x7a5a3a, night ? 0.55 : 0.95));
-
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(H * 2 + 200, H * 2 + 200),
     new THREE.MeshLambertMaterial({ map: groundTexture() }),
@@ -213,7 +203,6 @@ export function buildCity(scene, opts = {}) {
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(40, -0.05, 0);
   group.add(ground);
-
   const seaTex = seaTexture();
   seaTex.repeat.set(6, 14);
   const sea = new THREE.Mesh(
@@ -239,7 +228,6 @@ export function buildCity(scene, opts = {}) {
   foam.rotation.x = -Math.PI / 2;
   foam.position.set(WORLD.beachX - 38, 0.05, 0);
   group.add(foam);
-
   const roadTexH = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexH.repeat.set(40, 1);
   const roadTexV = asphaltTexture(5, night ? '#222836' : '#3a4150'); roadTexV.repeat.set(1, 40);
   const roadMatH = new THREE.MeshLambertMaterial({ map: roadTexH });
@@ -264,7 +252,6 @@ export function buildCity(scene, opts = {}) {
       dash2.rotation.x = -Math.PI / 2; dash2.position.set(r, 0.11, d); group.add(dash2);
     }
   }
-
   const crossV = new THREE.MeshBasicMaterial({ map: crosswalkTexture(false), transparent: true });
   const crossH = new THREE.MeshBasicMaterial({ map: crosswalkTexture(true), transparent: true });
   const crossGeoV = new THREE.PlaneGeometry(14, 9);
@@ -283,7 +270,6 @@ export function buildCity(scene, opts = {}) {
       group.add(m);
     }
   }
-
   const decals = [
     { text: 'OLD TOWN', sub: 'PLAZA MERCADO', x: 40, z: 160, vertical: false, color: '#7ee081' },
     { text: 'VELAMAR', sub: 'HARBOR CITY', x: -40, z: 0, vertical: false, color: '#ffd23f' },
@@ -298,7 +284,6 @@ export function buildCity(scene, opts = {}) {
     m.position.set(d.x, 0.13, d.z);
     group.add(m);
   }
-
   const lit = night ? 0.85 : 0.7;
   const facades = [
     artDecoFacade('#ffd9a0', lit, 11),
@@ -345,7 +330,6 @@ export function buildCity(scene, opts = {}) {
       colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
     }
   }
-
   const neons = [
     { text: 'VELA BANK', sub: 'VAULT • GLASS DISTRICT', x: 190, y: 14, z: -148, color: '#ffd23f', ry: Math.PI },
     { text: 'HOTEL AZUL', sub: 'ROOMS • SEA VIEW', x: -252, y: 12, z: 168, color: '#4cc9f0', ry: Math.PI / 2 },
@@ -361,7 +345,6 @@ export function buildCity(scene, opts = {}) {
     sign.rotation.y = n.ry;
     group.add(sign);
   }
-
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
   const leafMat = new THREE.MeshLambertMaterial({ color: 0x2fae5f });
   const leafMat2 = new THREE.MeshLambertMaterial({ color: 0x45c47a });
@@ -404,7 +387,6 @@ export function buildCity(scene, opts = {}) {
   for (let z = -320; z <= 320; z += 20) {
     group.add(makePalm(-263 + (pj() - 0.5) * 6, z + (pj() - 0.5) * 8, 8, (pj() - 0.5) * 0.08));
   }
-
   const poleMat = new THREE.MeshLambertMaterial({ color: 0x2b2b2b });
   const glowMat = new THREE.MeshBasicMaterial({ color: night ? 0xffe9a0 : 0xfff2c9, transparent: true, opacity: night ? 1 : 0.7 });
   function streetlight(x, z) {
@@ -422,7 +404,6 @@ export function buildCity(scene, opts = {}) {
     group.add(streetlight(-252, z));
     if (z % 80 === 0) group.add(streetlight(12, z));
   }
-
   const umbrellaColors = [0xe63946, 0xffd23f, 0x4cc9f0, 0xff8fa3, 0x7ee081, 0xf72585];
   for (let i = 0; i < 14; i++) {
     const z = -300 + i * 46;
@@ -449,7 +430,6 @@ export function buildCity(scene, opts = {}) {
     tower.position.set(-268, 0, tz);
     group.add(tower);
   }
-
   const pier = box(16, 1.2, 130, 0x8a6b3d, -292, 0.6, -190);
   group.add(pier);
   const tower = new THREE.Group();
@@ -483,14 +463,12 @@ export function buildCity(scene, opts = {}) {
   tower.add(beam);
   tower.position.set(-292, 1, -252);
   group.add(tower);
-
   const boat = new THREE.Group();
   const hull = box(6, 2.4, 16, 0xf4f4f4, 0, 1.2, 0);
   const cabin = box(4, 2.4, 5, 0x4361ee, 0, 3.4, -2);
   boat.add(hull, cabin);
   boat.position.set(-310, 0.4, -200);
   group.add(boat);
-
   const dockX = -252, dockZ = -140;
   const contCols = ['#c8342c', '#e07b2a', '#2a5fc8'];
   const contMats = contCols.map((c, i) => new THREE.MeshLambertMaterial({ map: containerTexture(c, 20 + i) }));
@@ -532,7 +510,6 @@ export function buildCity(scene, opts = {}) {
   cargo.position.set(-318, 0.4, -150);
   cargo.rotation.y = 0.15;
   group.add(cargo);
-
   const wheel = new THREE.Group();
   const wheelWhite = new THREE.MeshLambertMaterial({ color: 0xf4f4f4 });
   for (const s of [-1, 1]) {
@@ -573,7 +550,6 @@ export function buildCity(scene, opts = {}) {
   wheel.rotation.y = Math.PI / 2;
   wheel.position.set(-284, 0, -300);
   group.add(wheel);
-
   const shipSpots = [
     { x: -360, z: -260, c: 0xe63946 }, { x: -385, z: -60, c: 0x4cc9f0 },
     { x: -350, z: 120, c: 0xffd23f }, { x: -395, z: 240, c: 0x7ee081 },
@@ -592,7 +568,6 @@ export function buildCity(scene, opts = {}) {
     ship.rotation.y = 0.4;
     group.add(ship);
   }
-
   for (const d of DISTRICTS) {
     const tex = textTexture([d.name, d.sub], { color: d.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -609,7 +584,6 @@ export function buildCity(scene, opts = {}) {
     pole.position.set(d.x, d.big ? 8 : 6, d.z);
     group.add(pole);
   }
-
   for (const s of SHOP_SIGNS) {
     const tex = textTexture([s.name, s.sub], { color: s.color, bg: '#12233d' });
     const sign = new THREE.Mesh(
@@ -626,7 +600,6 @@ export function buildCity(scene, opts = {}) {
     pole.position.set(s.x, 1.5, s.z);
     group.add(pole);
   }
-
   const plaza = new THREE.Mesh(
     new THREE.CircleGeometry(34, 24),
     new THREE.MeshLambertMaterial({ map: sandTexture(), color: 0xd8cbb0 }),
@@ -667,11 +640,9 @@ export function buildCity(scene, opts = {}) {
     group.add(box(2.4, 0.5, 0.9, 0x8a6b3d, ux + 2, 0.25, uz + 2));
   }
   group.add(makePalm(34, 120, 8, 0.02), makePalm(86, 118, 7, -0.02));
-
   scene.add(group);
   return { group, colliders, clouds, roadMats: [roadMatH, roadMatV] };
 }
-
 export function resolveColliders(pos, r, colliders) {
   for (const c of colliders) {
     if (pos.x > c.minX - r && pos.x < c.maxX + r && pos.z > c.minZ - r && pos.z < c.maxZ + r) {

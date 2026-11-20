@@ -1,5 +1,4 @@
 import { GAME } from './config.js';
-
 export function loadSave() {
   try {
     const raw = localStorage.getItem(GAME.saveKey);
@@ -9,7 +8,6 @@ export function loadSave() {
     return s;
   } catch { return null; }
 }
-
 export function writeSave(state) {
   try {
     localStorage.setItem(GAME.saveKey, JSON.stringify({
@@ -23,7 +21,6 @@ export function writeSave(state) {
     }));
   } catch {  }
 }
-
 export function clearSave() {
   try { localStorage.removeItem(GAME.saveKey); } catch {  }
 }

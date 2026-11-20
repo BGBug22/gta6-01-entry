@@ -1,13 +1,11 @@
 import * as THREE from 'three';
 import { CAR_MODELS } from './config.js';
-
 function lam(color, opts = {}) {
   return new THREE.MeshLambertMaterial({ color, ...opts });
 }
 function phong(color, shininess = 90) {
   return new THREE.MeshPhongMaterial({ color, shininess, specular: 0xbbbbbb });
 }
-
 export function makeCarMesh(model, opts = {}) {
   const g = new THREE.Group();
   const sporty = model.id === 'sport' || model.id === 'coupe';
@@ -105,7 +103,6 @@ export function makeCarMesh(model, opts = {}) {
   g.userData.wheels = wheels;
   return g;
 }
-
 export class Car {
   constructor(scene, model, x, z, heading, opts = {}) {
     this.model = model;
@@ -145,7 +142,6 @@ export class Car {
   stop() { this.speed = 0; }
   kmh() { return Math.abs(this.speed) * 3.6; }
 }
-
 export function nearestCar(cars, x, z, maxDist) {
   let best = null, bestD = maxDist * maxDist;
   for (const c of cars) {

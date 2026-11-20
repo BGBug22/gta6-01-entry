@@ -7,7 +7,6 @@ export const WORLD = {
   roadGap: 80,
   seed: 20261117,
 };
-
 export const DISTRICTS = [
   { name: 'VELAMAR', sub: 'HARBOR CITY', x: 0, z: 0, color: '#ffd23f', big: true, ry: 0 },
   { name: 'PUERTO VELA', sub: 'DOCKS • FARO VELA', x: -210, z: -190, color: '#ff5d5d', ry: -0.98 },
@@ -15,16 +14,13 @@ export const DISTRICTS = [
   { name: 'PLAYA AZUL', sub: 'SUN BOULEVARD', x: -240, z: 160, color: '#4cc9f0', ry: 3.14159 },
   { name: 'GLASS DISTRICT', sub: 'TOWERS • OFFICES', x: 190, z: -160, color: '#f72585', ry: -1.5708 },
 ];
-
 export const PALETTE = {
   sky: 0x2a1e5e, fog: 0xef9a55, sun: 0xffb36b,
   road: 0x454a55, roadLine: 0xfff6c9, sidewalk: 0xc9bfa5, sand: 0xf2d8a0, sea: 0x1e90c8,
   building: [0xffd9a0, 0xffb4a2, 0xa0e7ff, 0xc8f7c5, 0xffe66d, 0xf7aef8, 0xffffff, 0xffc6ff],
   glass: [0x9fd8ff, 0x7ec8f7, 0xbde0fe],
 };
-
 export const ROOF_COLORS = [0xc96f4a, 0xe07b39, 0x8a5a3b, 0xb5502e, 0xd98e4a, 0xa34d28];
-
 export const CAR_MODELS = [
   { id: 'sedan', name: 'Vela Sedan', color: 0xe63946, speed: 34, accel: 16, price: 0 },
   { id: 'taxi', name: 'Azul Taxi', color: 0xffd23f, speed: 32, accel: 15, price: 0 },
@@ -33,13 +29,11 @@ export const CAR_MODELS = [
   { id: 'sport', name: 'Cometa GT', color: 0xf72585, speed: 48, accel: 24, price: 1200 },
   { id: 'van', name: 'Mercado Van', color: 0xffffff, speed: 28, accel: 12, price: 350 },
 ];
-
 export const SHOPS = {
   weapon: { name: 'EL GATILLO ARMS', x: 120, z: 60, pistolPrice: 150, ammoPrice: 40 },
   car: { name: 'COMETA MOTORS', x: 200, z: 100, carId: 'sport' },
   garage: { name: 'VELA GARAGE', x: -80, z: -200 },
 };
-
 export const SHOP_SIGNS = [
   { name: 'EL GATILLO ARMS', sub: 'GUNS • AMMO', x: 126, z: 67.6, color: '#ffd23f', ry: 3.1416 },
   { name: 'COMETA MOTORS', sub: 'DEALER • COMETA GT', x: 212, z: 168, color: '#f72585', ry: -1.72 },
@@ -50,36 +44,27 @@ export const SHOP_SIGNS = [
   { name: 'VELA BANK', sub: 'VAULT • GLASS DISTRICT', x: 200, z: -152, color: '#ffd23f', ry: -1.77 },
   { name: 'VELA GARAGE', sub: 'UPGRADES • REPAIRS', x: -68, z: -208, color: '#ff8fa3', ry: -0.24 },
 ];
-
 export const SHOP_PRICES = {
   pistol: 150, smg: 450, shotgun: 600, ammo: 40, armourRefill: 100,
   engine: 300, armourMax: 250,
 };
 export const SHOP_LIMITS = { engineMax: 3, armourMaxLevel: 2 };
-
 export const RADIO = [
   { name: 'SOL FM', freq: '95.4', style: 'SYNTHWAVE' },
   { name: 'VELA WAVE', freq: '101.2', style: 'CHILLWAVE' },
   { name: 'NIGHTWIRE', freq: '88.7', style: 'NIGHT DRIVE' },
 ];
-
 export const CLOCK = { day: 1, hour: 18, minute: 24, minutesPerSecond: 0.2 };
-
 export const ARMOUR = { start: 50, max: 100, regen: 6 };
-
 export const RESPECT = { perMission: 1, maxLevel: 5 };
-
 export const HELICOPTER = { minWanted: 4, height: 55, orbitRadius: 26, speed: 30 };
-
 export const DENSITY = { traffic: 26, pedestrians: 44 };
-
 export const WEAPONS = {
   fist: { name: 'FISTS', key: '1', damage: 34, rate: 0.45, ammo: Infinity, range: 2.4, spread: 0, icon: '✊' },
   pistol: { name: 'PISTOL', key: '2', damage: 50, rate: 0.35, ammo: 120, range: 90, spread: 0.01, icon: '🔫', price: 150 },
   smg: { name: 'MICRO-SMG', key: '3', damage: 22, rate: 0.12, ammo: 200, range: 60, spread: 0.05, icon: '🔫', price: 450 },
   shotgun: { name: 'SHOTGUN', key: '4', damage: 26, rate: 0.8, ammo: 40, range: 30, spread: 0.12, pellets: 5, icon: '🔫', price: 600 },
 };
-
 export const MISSIONS = [
   { id: 1, title: 'First Delivery', giver: 'MARA', text: 'Drop the package at Plaza Mercado. Do not open it.', target: { x: 60, z: 140 }, reward: 120, time: 0, type: 'goto' },
   { id: 2, title: 'Flash Cab', giver: 'MARA', text: 'A fare is waiting at Playa Azul. Get them to Faro Vela, fast!', target: { x: -180, z: 190 }, reward: 150, time: 150, type: 'taxi' },
@@ -90,7 +75,6 @@ export const MISSIONS = [
   { id: 7, title: 'Shoot Back', giver: 'RICO', text: 'Three dock thugs are waiting for you. Drop them all.', target: { x: -210, z: -120 }, reward: 500, time: 0, type: 'combat' },
   { id: 8, title: 'The Last Run', giver: 'MARA', text: 'Four stars are on your tail. Reach the boat at the end of the pier before time runs out!', target: { x: -292, z: -198 }, reward: 800, time: 150, type: 'finale' },
 ];
-
 export const DIALOGS = {
   1: { giver: 'MARA', line: 'Do not open the package. Plaza Mercado. Move.' },
   2: { giver: 'MARA', line: 'Fare waiting at Playa Azul. Faro Vela, and step on it!' },
@@ -101,7 +85,6 @@ export const DIALOGS = {
   7: { giver: 'RICO', line: 'Three dock thugs. Drop them all.' },
   8: { giver: 'MARA', line: 'The boat at the end of the pier. This is our last run!' },
 };
-
 export const GAME = {
   startMoney: 50,
   startHealth: 100,

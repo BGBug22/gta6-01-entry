@@ -15,7 +15,6 @@ import { loadSave, writeSave, clearSave } from './save.js';
 import { parseShot, stageShot } from './screenshot-staging.js';
 import { absorbDamage, regenArmour, respectLevel } from './wanted-level.js';
 import { makeHuman, walkPose, aimPose, idlePose, setWeapon } from './human.js';
-
 class Player {
   constructor(scene) {
     this.mesh = makeHuman({
@@ -49,7 +48,6 @@ class Player {
     return this.health <= 0;
   }
 }
-
 class Game {
   constructor(shot = null) {
     const canvas = document.getElementById('c');
@@ -94,7 +92,6 @@ class Game {
     this.camDist = 11.5;
     this.cameraSide = 0;
     this.camLookSide = 0;
-
     const { colliders, clouds, roadMats } = buildCity(this.scene, { night: this.night });
     this.colliders = colliders;
     this.clouds = clouds;
@@ -107,7 +104,6 @@ class Game {
     this.combat = new Combat(this.scene);
     this.missions = new StoryCampaign(this.scene, (t, d) => this.onMissionEvent(t, d));
     this.rng = makeRng(WORLD.seed + 99);
-
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') this.tryStartMission(); });
     window.addEventListener('keydown', (e) => {
@@ -125,7 +121,6 @@ class Game {
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
-
   spawnParkedCars() {
     const rng = makeRng(WORLD.seed + 33);
     const spots = [
@@ -144,27 +139,22 @@ class Game {
     }
     return list;
   }
-
   playerCar(model, x, z, heading) {
     const car = new Car(this.scene, model, x, z, heading);
     this.parked.push(car);
     return car;
   }
-
   addRespect(n) {
     this.respect = Math.min(5, this.respect + n);
   }
-
   applyUpgrades() {
     this.maxArmour = ARMOUR.max + 25 * this.upgrades.armour;
     this.carSpeedMul = 1 + 0.1 * this.upgrades.engine;
   }
-
   missionTarget() {
     if (this.taxiFare) return this.taxiFare.stage === 'pickup' ? this.taxiFare.pickup : this.taxiFare.drop;
     return this.missions.targetPos();
   }
-
   showStartScreen() {
     const save = loadSave();
     const txt = save
@@ -205,7 +195,6 @@ class Game {
     this.paused = true;
     this.hud.showScreen('PAUSED', `Money <b>$${this.money}</b> • Mission <b>${this.missions.index + 1}/8</b> • Wanted <b>${this.police.wanted}★</b><br>Progress saves automatically.`, '▶ CONTINUE', () => { this.paused = false; });
   }
-
   tryStartMission() {
     if (!this.started || this.paused || this.hud.screenVisible()) return;
     if (this.missions.state === 'active') {
@@ -275,7 +264,6 @@ class Game {
   removeTaxiPassenger() {
     if (this.taxiPassenger) { this.scene.remove(this.taxiPassenger); this.taxiPassenger = null; }
   }
-
   enterCar(car) {
     const p = this.player;
     p.inCar = true; p.car = car;
@@ -299,7 +287,6 @@ class Game {
     p.inCar = false; p.car = null;
     this.camDist = 10;
   }
-
   nearestShop() {
     const p = this.player.pos;
     if (dist2(p.x, p.z, SHOPS.weapon.x, SHOPS.weapon.z) < 100) return 'weapon';
@@ -424,7 +411,6 @@ class Game {
     this.hud.setWeapon(`${WEAPONS[w].name} — ${ammo}`);
     if (this.player && this.player.mesh) setWeapon(this.player.mesh, w);
   }
-
   startTaxiFare() {
     if (this.taxiFare || this.missions.state === 'active') { this.hud.showMessage('Finish what you started first!'); return; }
     const spots = [{ x: 120, z: -80 }, { x: -40, z: 120 }, { x: 200, z: -40 }, { x: 0, z: 200 }];
@@ -436,7 +422,6 @@ class Game {
     this.hud.showMessage('Taxi: pick up the fare at the yellow marker! ($80)');
     this.sound.coin();
   }
-
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -455,7 +440,6 @@ class Game {
     this.updateCamera(0.016);
     this.renderer.render(this.scene, this.camera);
   }
-
   stepWorld(dt, staging) {
     const input = this.input;
     const p = this.player;
@@ -482,12 +466,10 @@ class Game {
     const mouse = input.consumeMouse();
     this.cameraYaw -= mouse.dx * 0.004;
     this.cameraPitch = clamp(this.cameraPitch + mouse.dy * 0.003, 0.08, 1.1);
-
     if (!staging && this.started && !this.paused) {
       this.clockMin += dt * CLOCK.minutesPerSecond;
       if (this.clockMin >= 1440) { this.clockMin -= 1440; this.clockDay += 1; }
     }
-
     if (!p.inCar) {
       const mv = input.moveVector();
       const run = input.down('ShiftLeft') || input.down('ShiftRight');
@@ -571,7 +553,6 @@ class Game {
         }
       }
     }
-
     const allCars = [...this.traffic.map((t) => t.car), ...this.parked, ...this.police.cars];
     for (const t of this.traffic) t.update(dt, allCars);
     const danger = this.combat.weapon !== 'fist' ? { x: p.pos.x, z: p.pos.z } : null;
@@ -586,7 +567,6 @@ class Game {
     this.missions.update(dt, this);
     this.updateTaxiFare(dt);
     this.combat.update(dt);
-
     let prompt = null;
     if (!p.inCar) {
       const car = nearestCar(this.parked, p.pos.x, p.pos.z, 5);
@@ -603,21 +583,17 @@ class Game {
       prompt = (prompt ? prompt + '   •   ' : '') + '[M] Start mission: ' + this.missions.current().title;
     }
     this.hud.showPrompt(prompt);
-
     if (this.police.wanted === 0) {
       if (p.health < GAME.startHealth) p.health = Math.min(GAME.startHealth, p.health + 2 * dt);
       p.armour = regenArmour(p.armour, 0, dt, this.maxArmour);
     }
-
     this.respect = respectLevel(this.missions.index);
-
     let bestD = Infinity, bestName = 'VELAMAR';
     for (const d of DISTRICTS) {
       const dd = dist2(p.pos.x, p.pos.z, d.x, d.z);
       if (dd < bestD) { bestD = dd; bestName = d.name; }
     }
     this.districtName = bestName;
-
     this.hud.setHealth(p.health);
     this.hud.setArmour(p.armour, this.maxArmour);
     this.hud.setMoney(this.money);
@@ -659,12 +635,10 @@ class Game {
     this.minimap.draw(this);
     this.sound.setEngine(p.inCar ? Math.abs(p.car.speed) / p.car.model.speed : 0);
     this.sound.setSiren(this.police.wanted >= 2, dt);
-
     this.updateCamera(dt);
     this.renderer.render(this.scene, this.camera);
     input.endFrame();
   }
-
   updateTaxiFare(dt) {
     if (!this.taxiFare) return;
     const p = this.player.pos;
@@ -685,7 +659,6 @@ class Game {
       }
     }
   }
-
   hitTarget(t, dmg) {
     if (t instanceof Enemy || t.health !== undefined) {
       t.health -= dmg;
@@ -700,7 +673,6 @@ class Game {
       t.ped.fleeing = true;
     }
   }
-
   onWasted() {
     if (this.paused) return;
     this.money = Math.max(0, this.money - GAME.wastedFine);
@@ -725,7 +697,6 @@ class Game {
     this.paused = true;
     this.hud.showScreen('BUSTED!', `Vela Police held you overnight. Fine: <b>$${GAME.bustedFine}</b><br>Your money now: <b>$${this.money}</b>`, 'FREE AGAIN', () => { this.paused = false; });
   }
-
   updateCamera(dt) {
     const p = this.player;
     if (this.topDown) {
@@ -752,7 +723,6 @@ class Game {
     this.camera.lookAt(target.x + rx * lookSide, ly, target.z + rz * lookSide);
   }
 }
-
 const { shot } = parseShot();
 const game = new Game(shot);
 window.__game = game;

@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { WEAPONS, WORLD } from './config.js';
 import { makeHuman, aimPose } from './human.js';
 import { makeRng } from './random.js';
-
 export class Combat {
   constructor(scene) {
     this.scene = scene;
@@ -130,7 +129,6 @@ export class Combat {
     return g;
   }
 }
-
 export class Enemy {
   constructor(scene, x, z, seed = 0) {
     this.mesh = makeHuman({

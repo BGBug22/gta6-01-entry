@@ -8,7 +8,6 @@ export class Input {
     this.canvas = canvas;
     this.dragging = false;
     this.lastX = 0; this.lastY = 0;
-
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys[e.code] = true;
@@ -17,7 +16,6 @@ export class Input {
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
     window.addEventListener('blur', () => { this.keys = {}; });
-
     canvas.addEventListener('mousedown', (e) => {
       this.mouseDown = true; this.dragging = true;
       this.lastX = e.clientX; this.lastY = e.clientY;
@@ -34,7 +32,6 @@ export class Input {
       }
     });
   }
-
   down(code) { return !!this.keys[code]; }
   hit(code) { return !!this.pressed[code]; }
   moveVector() {

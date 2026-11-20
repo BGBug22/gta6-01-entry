@@ -1,12 +1,10 @@
 import * as THREE from 'three';
 import { MISSIONS, CAR_MODELS, GAME, DIALOGS } from './config.js';
 import { dist2 } from './random.js';
-
 export function dialogFor(mission) {
   if (!mission) return null;
   return DIALOGS[mission.id] || null;
 }
-
 export class StoryCampaign {
   constructor(scene, onEvent) {
     this.scene = scene;
@@ -25,7 +23,6 @@ export class StoryCampaign {
     this.animT = 0;
     scene.add(this.marker);
   }
-
   makeMarker() {
     const g = new THREE.Group();
     const beam = new THREE.Mesh(
@@ -46,9 +43,7 @@ export class StoryCampaign {
     g.visible = false;
     return g;
   }
-
   current() { return MISSIONS[this.index] || null; }
-
   stageInfo() {
     const m = this.current();
     if (!m) return { stage: 0, total: 8, next: 'All missions complete!' };
@@ -73,7 +68,6 @@ export class StoryCampaign {
     }
     return { stage: 1, total: 1, next: '' };
   }
-
   start() {
     const m = this.current();
     if (!m) return;
@@ -86,12 +80,10 @@ export class StoryCampaign {
     if (m.type === 'race') this.buildRaceGates();
     this.onEvent('start', m);
   }
-
   clearGates() {
     for (const g of this.gates) this.scene.remove(g.mesh);
     this.gates = [];
   }
-
   buildRaceGates() {
     const pts = [
       { x: 80, z: 0 }, { x: 80, z: 160 }, { x: -80, z: 160 }, { x: -80, z: -80 },
@@ -106,7 +98,6 @@ export class StoryCampaign {
       this.gates.push({ ...p, passed: false, mesh });
     }
   }
-
   targetPos() {
     const m = this.current();
     if (!m) return null;
@@ -115,7 +106,6 @@ export class StoryCampaign {
     if (m.type === 'heist') return this.heistGrabbed ? m.getaway : m.target;
     return m.target;
   }
-
   complete(game) {
     const m = this.current();
     this.state = 'done';
@@ -127,7 +117,6 @@ export class StoryCampaign {
     this.state = 'idle';
     this.onEvent('complete', m);
   }
-
   fail(reason) {
     this.state = 'failed';
     this.clearGates();
@@ -135,7 +124,6 @@ export class StoryCampaign {
     this.onEvent('fail', { mission: this.current(), reason });
     this.state = 'idle';
   }
-
   update(dt, game) {
     const m = this.current();
     if (!m || this.state !== 'active') return;
@@ -153,7 +141,6 @@ export class StoryCampaign {
       this.marker.children[2].position.y = 12 + Math.sin(this.animT * 4) * 1.2;
     }
     const near = (x, z, r = 7) => dist2(p.x, p.z, x, z) < r * r;
-
     switch (m.type) {
       case 'goto':
         if (near(m.target.x, m.target.z, 8)) this.complete(game);
@@ -214,17 +201,6 @@ export class StoryCampaign {
         break;
       default: break;
     }
-  }
-}
-
-export class SideActivities {
-  constructor() { this.taxiFare = null; this.raceTimer = 0; }
-  startTaxiFare(game) {
-    const spots = [{ x: 120, z: -80 }, { x: -40, z: 120 }, { x: 200, z: -40 }, { x: 0, z: 200 }];
-    const a = spots[Math.floor(Math.random() * spots.length)];
-    const b = spots[Math.floor(Math.random() * spots.length)];
-    this.taxiFare = { pickup: a, drop: b, stage: 'pickup', pay: 80 };
-    return this.taxiFare;
   }
 }
 export { CAR_MODELS, GAME };
